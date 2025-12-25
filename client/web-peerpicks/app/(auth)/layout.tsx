@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Map, Star, Users } from 'lucide-react'; // These are safe
 import Image from 'next/image';
-import logo1 from "@/public/logo1.png";
+import logo1 from "@/public/logo2.png";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
