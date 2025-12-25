@@ -1,30 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand Colors */
   --color-secondary: #70f800;
   --color-brand-dark: #050505;
-  
-  /* Custom Animations */
-  @keyframes float {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-15px) rotate(2deg); }
-  }
-
-  @keyframes fadeInUp {
-    0% { opacity: 0; transform: translateY(30px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
 
   /* Animation Utilities */
   --animate-float: float 6s ease-in-out infinite;
   --animate-fade-in-up: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(2deg); }
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 /* Base Styles & Resets */
 @layer base {
   :root {
     color-scheme: dark;
+    /* Default Dark Theme Variables */
+    --bg-main: #050505;
+    --text-main: #ffffff;
+    --card-bg: #111111;
+    --nav-bg: rgba(0, 0, 0, 0.8);
+  }
+
+  /* Light Theme Overrides */
+  .light {
+    color-scheme: light;
+    --bg-main: #f8fafc;
+    --text-main: #0f172a;
+    --card-bg: #ffffff;
+    --nav-bg: rgba(255, 255, 255, 0.8);
   }
 
   html {
@@ -32,37 +44,34 @@
   }
 
   body {
-    @apply bg-[#050505] text-white antialiased;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    transition: background-color 0.5s ease, color 0.5s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     margin: 0;
     padding: 0;
+    /* REMOVED: overflow: hidden, position: fixed, height: 100% */
   }
 
-  /* Custom Scrollbar for Modern Browsers */
-  ::-webkit-scrollbar {
-    width: 8px;
+  /* Fix for autofill placeholders */
+  input:-webkit-autofill {
+    -webkit-text-fill-color: #0f172a;
+    -webkit-box-shadow: 0 0 0px 1000px white inset;
+    transition: background-color 5000s ease-in-out 0s;
   }
 
-  ::-webkit-scrollbar-track {
-    background: #0a0a0a;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #222;
-    border-radius: 10px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-secondary);
-  }
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-secondary); }
 }
 
-/* Custom Component Utilities */
 @layer utilities {
   .glass {
-    @apply bg-black/60 backdrop-blur-xl border-b border-white/10;
-  }
-  
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500;
+    background-color: var(--nav-bg);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
