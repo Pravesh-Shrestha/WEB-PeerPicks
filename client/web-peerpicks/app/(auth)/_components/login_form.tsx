@@ -3,15 +3,24 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, LoginData } from "../schema";
 import Link from "next/link";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Mail, Lock, ChevronRight } from "lucide-react";
 
 export default function LoginForm() {
+  const router = useRouter(); // Initialize router
   const { register, handleSubmit, formState: { errors } } = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = (data: LoginData) => {
     console.log("Login Data:", data);
+    
+    // 1. Simulate a backend response by saving to localStorage
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("userEmail", data.email); // Optional: save user info
+    
+    // 2. Redirect to the protected home page
+    router.push("/home");
   };
 
   return (
@@ -62,11 +71,15 @@ export default function LoginForm() {
         </button>
       </form>
 
-      {/* Social Icons Section (Matches Signup) */}
+      {/* Social Icons Section */}
       <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center">
         <p className="text-slate-500 text-[9px] uppercase font-bold tracking-[0.2em] mb-5">Quick login with</p>
         <div className="flex gap-8">
-          <button type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
+          <button 
+            type="button" 
+            onClick={() => onSubmit({ email: "test@example.com", password: "password" })} // Allow social buttons to bypass for testing
+            className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all"
+          >
             <span className="font-bold text-sm italic">G</span>
           </button>
           <button type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
