@@ -87,7 +87,22 @@ export default function SignupForm() {
         </button>
       </form>
 
-      {/* Social Icons remain at the bottom */}
+     {/* Social Icons Section */}
+      <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center">
+        <p className="text-slate-500 text-[9px] uppercase font-bold tracking-[0.2em] mb-5">Quick login with</p>
+        <div className="flex gap-8">
+          <button 
+            type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
+            <span className="font-bold text-sm italic">G</span>
+          </button>
+          <button type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
+            <span className="font-bold text-sm italic">f</span>
+          </button>
+          <button type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
+            <span className="font-bold text-sm italic">A</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
