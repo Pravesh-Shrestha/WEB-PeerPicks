@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import { AuthService } from '../services/auth.service';
-import { signupDTO, loginDTO } from '../dtos/auth.dto';
+import { Request, Response } from "express";
+import { AuthService } from "../services/auth.service";
+import { signupDTO, loginDTO } from "../dtos/auth.dto";
 
 const authService = new AuthService();
 
@@ -9,9 +9,9 @@ export class AuthController {
     try {
       const validatedData = signupDTO.parse(req.body);
       const user = await authService.register(validatedData);
-      res.status(201).json(user);
+      res.status(201).json({ message: "Registration successful", user });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error.message || "Signup failed" });
     }
   }
 
@@ -19,9 +19,9 @@ export class AuthController {
     try {
       const validatedData = loginDTO.parse(req.body);
       const result = await authService.login(validatedData);
-      res.json(result);
+      res.status(200).json(result);
     } catch (error: any) {
-      res.status(401).json({ error: error.message });
+      res.status(401).json({ error: error.message || "Login failed" });
     }
   }
 }
