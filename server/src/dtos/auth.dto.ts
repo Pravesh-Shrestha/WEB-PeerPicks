@@ -5,7 +5,11 @@ export const signupDTO = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   gender: z.enum(["male", "female"], { error: "Gender is required" }),
-  age: z.coerce.number().min(13, "Must be at least 13 years old"),
+  dob: z.coerce.date().refine(date => {
+    const ageDifMs = Date.now() - date.getTime();
+    const ageDate = new Date(ageDifMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970) >= 13;
+  }, "Must be at least 13 years old"),
   phone: z.string().min(10, "Valid phone number required"),
 });
 
