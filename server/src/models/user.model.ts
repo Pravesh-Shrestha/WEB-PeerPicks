@@ -14,4 +14,15 @@ const userSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-export const User = mongoose.model('User', userSchema);
+export interface IUser extends mongoose.Document {
+  _id: mongoose.Types.ObjectId;
+  fullName: string;
+  email: string;
+  password: string;
+  gender: 'male' | 'female';
+  age: number;
+  phone: string;
+  role: 'user' | 'admin';
+}
+
+export const UserModel = mongoose.model<IUser>('User', userSchema);
