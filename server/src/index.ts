@@ -1,14 +1,19 @@
 import dotenv from 'dotenv';
-dotenv.config(); 
-
 import cors from 'cors';
+dotenv.config(); 
 import { connectDB } from './database/database.db';
 import authRoutes from './routes/auth.routes';
 import express,{Application,Request,Response} from 'express';
-const app = express();
+
+const app: Application = express();
+
+let corsOptions = {
+    origin: ["http://localhost:3000", "http://localhost:3001"], 
+}
+//frontend urls
 
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Database

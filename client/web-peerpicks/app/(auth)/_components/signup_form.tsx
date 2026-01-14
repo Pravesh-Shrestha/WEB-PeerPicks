@@ -3,15 +3,32 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema, SignupData } from "../schema";
 import Link from "next/link";
+import { handleRegister } from "@/lib/actions/auth-action";
 import { User, Smartphone, Mail, Lock, Hash, ChevronDown } from "lucide-react";
-
+import { useState } from "react";
+import { th } from "zod/locales";
+import { useRouter } from "next/navigation";
 export default function SignupForm() {
   const { register, handleSubmit, formState: { errors } } = useForm<SignupData>({
     resolver: zodResolver(signupSchema),
     mode: "onBlur" // Validates when user leaves the input
   });
+  const router = useRouter();
 
-  const onSubmit = (data: SignupData) => console.log("Validated Data:", data);
+  const [error,setError]= useState("");
+
+  const onSubmit = async (data: SignupData) => {
+    setError("");
+    try {
+      const result = await handleRegister(data);
+      if (result.success) {
+        throw new Error("Registration successful. Please log in.");
+      } 
+      router.push("/login");
+    } catch (err: Error |any) {
+      setError(err.message);
+    }
+  };
 
   return (
     <div className="w-full">
