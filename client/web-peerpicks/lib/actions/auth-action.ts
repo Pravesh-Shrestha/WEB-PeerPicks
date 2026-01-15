@@ -1,5 +1,5 @@
 //server side processing for authentication actions
-"user server";
+"use server";
 
 import { da } from 'zod/locales';
 import {register} from '../api/auth';

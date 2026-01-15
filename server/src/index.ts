@@ -1,31 +1,41 @@
-import dotenv from 'dotenv';
+// src/index.ts
+import express, { Application } from 'express';
 import cors from 'cors';
-dotenv.config(); 
 import { connectDB } from './database/database.db';
 import authRoutes from './routes/auth.routes';
-import express,{Application,Request,Response} from 'express';
 
 const app: Application = express();
 
-let corsOptions = {
-    origin: ["http://localhost:3000", "http://localhost:3001"], 
-}
-//frontend urls
-
-// Middlewares
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// Database
+// 1. Database connection
 connectDB();
 
-app.get('/',(req:Request,res:Response)=>{
-    res.send('Hello, World!');
-});
-// API Routes
+// 2. CORS: Allow both Web and Mobile origins
+const allowedOrigins = [
+  "http://localhost:3000", // Web Local
+  "http://localhost:3001", // Web Alternative
+    "http://192.168.137.1:3000", // Mobile Emulator/WebView
+  // Add mobile device IPs if testing on physical devices
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow mobile apps (no origin) or specific web origins
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+app.use(express.json());
+
+// 3. API Routes
 app.use('/api/auth', authRoutes);
 
+// 4. Bind to 0.0.0.0 to be reachable by Flutter/Mobile on the same network
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+app.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
 });
