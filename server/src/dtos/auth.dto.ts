@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { nullable, z } from "zod";
 
 export const signupDTO = z.object({
   fullName: z.string().min(2, "Full name is required"),
@@ -11,7 +11,7 @@ export const signupDTO = z.object({
     return Math.abs(ageDate.getUTCFullYear() - 1970) >= 13;
   }, "Must be at least 13 years old"),
   phone: z.string().min(10, "Valid phone number required"),
-  profilePicture: z.string().optional(), // Add this line
+  profilePicture: z.string().optional().nullable(), // Add this line
 });
 
 export const loginDTO = z.object({

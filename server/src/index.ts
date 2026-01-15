@@ -1,26 +1,32 @@
-// src/index.ts
-import express, { Application } from 'express';
+import express, { Application, Request, Response, NextFunction } from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+
 import { connectDB } from './database/database.db';
+import { PORT, ALLOWED_ORIGINS } from './config/index'; 
 import authRoutes from './routes/auth.routes';
 
 const app: Application = express();
 
-// 1. Database connection
+// 1. DATABASE CONNECTION
 connectDB();
 
-// 2. CORS: Allow both Web and Mobile origins
-const allowedOrigins = [
-  "http://localhost:3000", // Web Local
-  "http://localhost:3001", // Web Alternative
-    "http://192.168.137.1:3000", // Mobile Emulator/WebView
-  // Add mobile device IPs if testing on physical devices
-];
+// 2. BODY PARSERS (Must come BEFORE sanitization and routes)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+// 3. SECURITY & LOGGING
+app.use(helmet()); // Basic security headers
+app.use(morgan('dev')); // Request logging
+
+// 4. CORS CONFIGURATION
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow mobile apps (no origin) or specific web origins
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (Mobile apps/Postman) or listed origins
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -29,13 +35,74 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+// 5. ROBUST SANITIZATION MIDDLEWARE
+// Prevents NoSQL Injection and XSS without breaking Date/Number objects
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const skipFields = ["email", "password", "profilePicture"];
 
-// 3. API Routes
+  const sanitize = (obj: any): any => {
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      for (const key in obj) {
+        // Skip specific fields OR values that aren't strings (like Dates/Numbers)
+        if (skipFields.includes(key) || typeof obj[key] !== "string") {
+          continue;
+        }
+
+        let value = obj[key];
+        // 1. Anti-NoSQL Injection (removes $)
+        value = value.replace(/\$/g, ""); 
+        
+        // 2. Anti-XSS (removes < > tags) - Skip for emails
+        if (!value.includes("@")) {
+          value = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+        
+        obj[key] = value;
+      }
+    }
+    return obj;
+  };
+
+  if (req.body) req.body = sanitize(req.body);
+  next();
+});
+
+// 6. GLOBAL RATE LIMITER
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  message: { success: false, message: "Too many requests, please try again later." }
+});
+app.use('/api/', limiter);
+
+// 7. ROUTES
 app.use('/api/auth', authRoutes);
 
-// 4. Bind to 0.0.0.0 to be reachable by Flutter/Mobile on the same network
-const PORT = process.env.PORT || 5000;
-app.listen(Number(PORT), "0.0.0.0", () => {
-    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+// Health Check Route
+app.get('/', (req, res) => {
+  res.status(200).json({ success: true, message: "🚀 PeerPicks API is live" });
+});
+
+// Static files (for profile pictures)
+app.use('/public', express.static(path.join(__dirname, '../public')));
+
+// 8. GLOBAL ERROR HANDLER
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  const status = err.statusCode || 500;
+  console.error(`[Error] ${err.message}`);
+  
+  res.status(status).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    // Only show stack trace in development mode
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// 9. SERVER INITIALIZATION
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`\n✅ PeerPicks Server is ready!`);
+  console.log(`📡 Local:   ${PORT}`);
+  console.log(`🌐 Network: ${PORT} (Use this for Mobile/Flutter)`);
 });
