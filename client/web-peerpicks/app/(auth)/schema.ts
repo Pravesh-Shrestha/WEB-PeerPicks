@@ -21,14 +21,9 @@ export type LoginData = z.infer<typeof loginSchema>;
 export const signupSchema = z.object({
     fullName: z.string()
         .min(2, { message: "Full name is required" }),
-    
-    // Restricted to 'male' or 'female' to match Mongoose enum
     gender: z.enum(["male", "female"], {
         message: "Please select a valid gender",
     }),
-
-    // Replaced 'age' with 'dob' to match backend schema
-    // Includes the 13-year-old requirement from auth.dto.ts
     dob: z.coerce.date().refine((date) => {
         const ageDifMs = Date.now() - date.getTime();
         const ageDate = new Date(ageDifMs);
@@ -40,7 +35,7 @@ export const signupSchema = z.object({
 
     email: z.string()
         .email({ message: "Enter a valid email" })
-        .toLowerCase(), // Ensures unique index consistency in MongoDB
+        .toLowerCase(),
 
     password: z.string()
         .min(8, { message: "Password must be at least 8 characters" }), // Updated to 8

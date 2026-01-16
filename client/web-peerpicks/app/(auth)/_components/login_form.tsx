@@ -5,6 +5,8 @@ import { loginSchema, LoginData } from "../schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation"; // Import useRouter
 import { Mail, Lock, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { handleLogin } from "@/lib/actions/auth-action";
 
 export default function LoginForm() {
   const router = useRouter(); // Initialize router
@@ -12,16 +14,25 @@ export default function LoginForm() {
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = (data: LoginData) => {
-    console.log("Login Data:", data);
-    
-    // 1. Simulate a backend response by saving to localStorage
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userEmail", data.email); // Optional: save user info
-    
-    // 2. Redirect to the protected home page
-    router.push("/home");
-  };
+  const [error, setError] = useState("");
+
+  const onSubmit = async(data: LoginData) => {
+    setError("");
+    try {
+      const result = await handleLogin(data);
+
+      if (result?.success) {
+        // Redirect on success
+        router.push("/dashboard"); // Redirect to dashboard or desired page
+      } else {
+        // Set error message from server if login failed
+        setError(result?.message || "Login failed. Please try again.");
+      }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err:Error | any) {
+      setError(err.message || "An unexpected error occurred");
+    }
+  }
 
   return (
     <div className="w-full">

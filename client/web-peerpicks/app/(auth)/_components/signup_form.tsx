@@ -4,29 +4,32 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema, SignupData } from "../schema";
 import Link from "next/link";
 import { handleRegister } from "@/lib/actions/auth-action";
-import { User, Smartphone, Mail, Lock, Hash, ChevronDown } from "lucide-react";
+import { User, Smartphone, Mail, Lock, Calendar, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { th } from "zod/locales";
 import { useRouter } from "next/navigation";
-export default function SignupForm() {
-  const { register, handleSubmit, formState: { errors } } = useForm<SignupData>({
-    resolver: zodResolver(signupSchema),
-    mode: "onBlur" // Validates when user leaves the input
-  });
-  const router = useRouter();
 
-  const [error,setError]= useState("");
+export default function SignupForm() {
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignupData>({
+    mode: "onBlur"
+  });
+  
+  const router = useRouter();
+  const [error, setError] = useState("");
 
   const onSubmit = async (data: SignupData) => {
     setError("");
     try {
       const result = await handleRegister(data);
-      if (result.success) {
-        throw new Error("Registration successful. Please log in.");
-      } 
-      router.push("/login");
-    } catch (err: Error |any) {
-      setError(err.message);
+      
+      if (result?.success) {
+        // Redirect on success
+        router.push("/login");
+      } else {
+        // Set error message from server if registration failed
+        setError(result?.message || "Something went wrong. Please try again.");
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
     }
   };
 
@@ -39,6 +42,13 @@ export default function SignupForm() {
         </p>
       </div>
 
+      {/* Display General Error Message */}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-xs p-3 rounded-xl mb-4">
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5">
         {/* Full Name */}
         <div className="relative">
@@ -49,7 +59,7 @@ export default function SignupForm() {
           {errors.fullName && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.fullName.message}</span>}
         </div>
 
-        {/* Gender & Age Row */}
+        {/* Gender & Date of Birth Row */}
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div className="relative">
             <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.gender ? 'border-red-500' : 'border-transparent'}`}>
@@ -64,11 +74,11 @@ export default function SignupForm() {
           </div>
 
           <div className="relative">
-            <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.age ? 'border-red-500' : 'border-transparent'}`}>
-              <input {...register("age")} placeholder="Age" className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" />
-              <Hash size={14} className="text-slate-400" />
+            <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.dob ? 'border-red-500' : 'border-transparent'}`}>
+              <input {...register("dob")} type="date" className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" />
+              <Calendar size={14} className="text-slate-400" />
             </div>
-            {errors.age && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.age.message}</span>}
+            {errors.dob && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.dob.message}</span>}
           </div>
         </div>
 
@@ -99,17 +109,20 @@ export default function SignupForm() {
           {errors.password && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.password.message}</span>}
         </div>
 
-        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] mt-4 shadow-lg">
-          Sign Up
+        <button 
+          disabled={isSubmitting}
+          type="submit" 
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] mt-4 shadow-lg disabled:opacity-50"
+        >
+          {isSubmitting ? "Creating Account..." : "Sign Up"}
         </button>
       </form>
 
-     {/* Social Icons Section */}
+      {/* Social Icons Section */}
       <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center">
         <p className="text-slate-500 text-[9px] uppercase font-bold tracking-[0.2em] mb-5">Quick login with</p>
         <div className="flex gap-8">
-          <button 
-            type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
+          <button type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
             <span className="font-bold text-sm italic">G</span>
           </button>
           <button type="button" className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all">
