@@ -4,16 +4,13 @@ import { handleRegister } from "@/lib/actions/auth-action";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { 
   User, Smartphone, Mail, Lock, Calendar, 
-  ChevronDown, Eye, EyeOff, CheckCircle2, AlertCircle 
+  ChevronDown, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 
 } from "lucide-react";
-import { signupSchema } from "../schema"; // Ensure this matches RegisterFormValues
-
-type SignupData = z.infer<typeof signupSchema>;
+import { signupSchema, SignupData } from "../schema";
 
 export default function SignupForm() {
   const router = useRouter();
@@ -26,147 +23,251 @@ export default function SignupForm() {
     register,
     handleSubmit,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<SignupData>({
     resolver: zodResolver(signupSchema),
-    mode: "onBlur"
+    mode: "onBlur",
   });
 
-  // Watch password value to toggle the visibility icon (as per your requested logic)
   const passwordValue = watch("password");
 
-  const onSubmit = async (data: SignupData) => {
+const onSubmit = async (data: SignupData) => {
+  setMessage("");
+  setIsSuccess(false);
 
-    setMessage("");
-    setIsSuccess(false);
-    try {
+  try {
+    const result = await handleRegister(data);
 
-      const result = await handleRegister(data);
-      if (result.success) {
-        setIsSuccess(true);
-        setMessage("Account created successfully! Redirecting...");
-        setTimeout(() => {
-          router.push("/login");
-        }, 2000);
-      } else {
-        throw new Error(result.message || "Registration failed");
-      }
-    } catch (err: any) {
-      setIsSuccess(false);
-      setMessage(err.message || "Registration failed");
+    // DEBUG: Look at your browser console to see what 'result' actually contains
+    console.log("Signup Result:", result);
+
+    if (result?.success) {
+      setIsSuccess(true);
+      setMessage("Account created successfully!");
+      setTimeout(() => {
+              router.push("/login");
+            }, 2000);
+      return;
     }
-  };
+
+    setIsSuccess(false);
+    setMessage(result?.message || "Registration failed. Please try again.");
+  } catch (err: any) {
+    console.error("Signup submit error:", err);
+    setIsSuccess(false);
+    setMessage(err?.message || "A network error occurred.");
+  }
+};
 
   return (
     <div className="w-full">
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold text-white tracking-tight">Create account</h2>
-        <p className="text-slate-400 text-[11px] mt-1">
-          Join PeerPicks. Already a member? <Link href="/login" className="text-indigo-400 font-semibold hover:underline">Log in</Link>
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-white tracking-tight">
+          Create account
+        </h2>
+        <p className="text-slate-400 text-[11px] mt-2">
+          Join PeerPicks. Already a member?{" "}
+          <Link
+            href="/login"
+            className="text-indigo-400 font-semibold hover:underline"
+          >
+            Log in
+          </Link>
         </p>
       </div>
 
-      {/* Logic: Displaying Error or Success Messages */}
+      {/* 1. Ensure message exists before rendering */}
       {message && (
-        <div className={`flex items-center gap-2 border p-3 rounded-xl mb-4 text-xs font-medium animate-in fade-in slide-in-from-top-1 ${
-          isSuccess 
-            ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400" 
-            : "bg-red-500/10 border-red-500/50 text-red-500"
-        }`}>
-          {isSuccess ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-          {message}
+        <div
+          className={`flex items-center gap-2 border p-3 rounded-xl mb-4 text-xs font-medium animate-in fade-in slide-in-from-top-1 ${
+            /* 2. Logic: IF success is true, USE emerald (green). ELSE, USE red. */
+            isSuccess
+              ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400"
+              : "bg-red-500/10 border-red-500/50 text-red-500"
+          }`}
+        >
+          {/* 3. Logic: Match the icon to the boolean */}
+          {isSuccess ? (
+            <CheckCircle2 size={14} className="shrink-0" />
+          ) : (
+            <AlertCircle size={14} className="shrink-0" />
+          )}
+
+          <span>{message}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5">
-        <fieldset disabled={isSubmitting || isSuccess} className="space-y-2.5">
-          
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <fieldset disabled={isSubmitting || isSuccess} className="space-y-3">
           {/* Full Name */}
           <div className="relative">
-            <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 transition-all ${errors.fullName ? 'border-red-500' : 'border-transparent focus-within:border-indigo-500'}`}>
-              <input {...register("fullName")} placeholder="Full Name" className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" />
-              <User size={14} className="text-slate-400" />
+            <div
+              className={`bg-white rounded-xl flex items-center px-4 h-[48px] border-2 transition-all ${
+                errors.fullName
+                  ? "border-red-500"
+                  : "border-transparent focus-within:border-indigo-500"
+              }`}
+            >
+              <input
+                {...register("fullName")}
+                placeholder="Full Name"
+                className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
+              />
+              <User size={16} className="text-slate-400" />
             </div>
-            {errors.fullName && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.fullName.message}</span>}
+            {errors.fullName && (
+              <p className="text-[10px] text-red-500 font-bold absolute -bottom-4 left-2 uppercase italic">
+                {errors.fullName.message}
+              </p>
+            )}
           </div>
 
           {/* Gender & DOB Row */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-2 gap-4">
             <div className="relative">
-              <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.gender ? 'border-red-500' : 'border-transparent'}`}>
-                <select {...register("gender")} className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold appearance-none">
+              <div
+                className={`bg-white rounded-xl flex items-center px-4 h-[48px] border-2 transition-all ${
+                  errors.gender
+                    ? "border-red-500"
+                    : "border-transparent focus-within:border-indigo-500"
+                }`}
+              >
+                <select
+                  {...register("gender")}
+                  className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold appearance-none"
+                >
                   <option value="">Gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                 </select>
-                <ChevronDown size={14} className="text-slate-400" />
+                <ChevronDown size={16} className="text-slate-400" />
               </div>
-              {errors.gender && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.gender.message}</span>}
+              {errors.gender && (
+                <p className="text-[10px] text-red-500 font-bold absolute -bottom-4 left-2 uppercase italic">
+                  {errors.gender.message}
+                </p>
+              )}
             </div>
 
             <div className="relative">
-              <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.dob ? 'border-red-500' : 'border-transparent'}`}>
-                <input {...register("dob")} type="date" className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" />
-                <Calendar size={14} className="text-slate-400" />
+              <div
+                className={`bg-white rounded-xl flex items-center px-4 h-[48px] border-2 transition-all ${
+                  errors.dob
+                    ? "border-red-500"
+                    : "border-transparent focus-within:border-indigo-500"
+                }`}
+              >
+                <input
+                  {...register("dob")}
+                  type="date"
+                  className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
+                />
+                <Calendar size={16} className="text-slate-400" />
               </div>
-              {errors.dob && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.dob.message}</span>}
+              {errors.dob && (
+                <p className="text-[10px] text-red-500 font-bold absolute -bottom-4 left-2 uppercase italic">
+                  {errors.dob.message}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Phone Number */}
+          {/* Phone */}
           <div className="relative pt-1">
-            <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.phone ? 'border-red-500' : 'border-transparent focus-within:border-indigo-500'}`}>
-              <input {...register("phone")} placeholder="Phone Number" className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" />
-              <Smartphone size={14} className="text-slate-400" />
+            <div
+              className={`bg-white rounded-xl flex items-center px-4 h-[48px] border-2 transition-all ${
+                errors.phone
+                  ? "border-red-500"
+                  : "border-transparent focus-within:border-indigo-500"
+              }`}
+            >
+              <input
+                {...register("phone")}
+                placeholder="Phone Number"
+                className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
+              />
+              <Smartphone size={16} className="text-slate-400" />
             </div>
-            {errors.phone && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.phone.message}</span>}
+            {errors.phone && (
+              <p className="text-[10px] text-red-500 font-bold absolute -bottom-4 left-2 uppercase italic">
+                {errors.phone.message}
+              </p>
+            )}
           </div>
 
           {/* Email */}
           <div className="relative pt-1">
-            <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.email ? 'border-red-500' : 'border-transparent focus-within:border-indigo-500'}`}>
-              <input {...register("email")} placeholder="Email Address" className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" />
-              <Mail size={14} className="text-slate-400" />
+            <div
+              className={`bg-white rounded-xl flex items-center px-4 h-[48px] border-2 transition-all ${
+                errors.email
+                  ? "border-red-500"
+                  : "border-transparent focus-within:border-indigo-500"
+              }`}
+            >
+              <input
+                {...register("email")}
+                placeholder="Email Address"
+                className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
+              />
+              <Mail size={16} className="text-slate-400" />
             </div>
-            {errors.email && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.email.message}</span>}
+            {errors.email && (
+              <p className="text-[10px] text-red-500 font-bold absolute -bottom-4 left-2 uppercase italic">
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
-          {/* Password with your Logic (only show icon when focused or has value) */}
+          {/* Password */}
           <div className="relative pt-1">
-            <div className={`bg-white rounded-xl flex items-center px-4 h-[40px] border-2 ${errors.password ? 'border-red-500' : 'border-transparent focus-within:border-indigo-500'}`}>
-              <input 
-                {...register("password")} 
-                type={showPassword ? "text" : "password"} 
-                placeholder="Password" 
-                className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold" 
+            <div
+              className={`bg-white rounded-xl flex items-center px-4 h-[48px] border-2 transition-all ${
+                errors.password
+                  ? "border-red-500"
+                  : "border-transparent focus-within:border-indigo-500"
+              }`}
+            >
+              <input
+                {...register("password")}
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
               />
-              
-              {/* Logic: Visibility toggle only appears if focused or has content */}
               {(passwordValue || passwordFocused) && (
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="mr-2 text-slate-400 hover:text-indigo-600 transition-colors focus:outline-none"
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="mr-2 text-slate-400 hover:text-indigo-600 focus:outline-none"
                 >
-                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               )}
-              <Lock size={14} className="text-slate-400" />
+              <Lock size={16} className="text-slate-400" />
             </div>
-            {errors.password && <span className="text-[9px] text-red-400 font-bold absolute -bottom-3.5 left-2 uppercase italic">{errors.password.message}</span>}
+            {errors.password && (
+              <p className="text-[10px] text-red-500 font-bold absolute -bottom-4 left-2 uppercase italic">
+                {errors.password.message}
+              </p>
+            )}
           </div>
         </fieldset>
 
-        <button 
+        <button
           disabled={isSubmitting || isSuccess}
-          type="submit" 
-          className={`w-full text-white text-xs font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] mt-4 shadow-lg disabled:opacity-50 ${
+          type="submit"
+          className={`w-full text-white text-xs font-bold py-4 rounded-xl transition-all active:scale-[0.98] mt-4 shadow-lg flex items-center justify-center gap-2 ${
             isSuccess ? "bg-emerald-600" : "bg-indigo-600 hover:bg-indigo-700"
           }`}
         >
-          {isSubmitting ? "Creating Account..." : isSuccess ? "Success! Redirecting..." : "Sign Up"}
+          {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+          {isSubmitting
+            ? "Creating Account..."
+            : isSuccess
+            ? "Success!"
+            : "Sign Up"}
         </button>
       </form>
     </div>

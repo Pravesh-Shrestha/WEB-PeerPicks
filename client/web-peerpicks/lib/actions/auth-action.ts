@@ -3,26 +3,33 @@
 import { register, login } from '../api/auth';
 import { SignupData } from '../../app/(auth)/schema'; 
 import { setAuthToken, setUserData } from '../cookie';
-
+import { redirect } from 'next/navigation';
+import { clearAuthCookies } from "../cookie";
 /**
  * Handles the Registration Logic
  */
 export const handleRegister = async (data: SignupData) => {
   try {
     const result = await register(data);
-    
-    // Check for success or the presence of a created user/id
-    if (result && (result.success || result.id || result.data)) {
-      return { 
-        success: true, 
-        message: 'Registration successful', 
-        data: result.data || result 
+
+    /**
+     * Backend signup returns: { message: "Registration successful", user: {...} }
+     * (no `success` boolean). Normalize it for the UI.
+     */
+    const createdUser = result?.user ?? result?.data ?? null;
+    const isCreated = Boolean(createdUser) || Boolean(result?.id);
+
+    if (isCreated) {
+      return {
+        success: true,
+        message: result?.message || "Registration successful",
+        data: createdUser ?? result,
       };
     }
 
-    return { 
-      success: false, 
-      message: result?.message || 'Registration failed' 
+    return {
+      success: false,
+      message: result?.message || "Registration failed",
     };
 
   } catch (error: any) {
@@ -91,4 +98,21 @@ export const handleLogin = async (data: { email: string; password: string }) => 
   } finally {
     console.log("--- Login Process Finished ---");
   }
+};
+
+export const handleLogout = async () => {
+  try {
+    // 1. Clear auth cookies (Deletes auth_token and user_data)
+    await clearAuthCookies();
+    
+    // Log for server-side debugging
+    console.log("User logged out successfully.");
+  } catch (error) {
+    console.error("Logout Error:", error);
+    // Even if cookie deletion fails, we typically still want to redirect
+  }
+
+  // 2. Redirect to login page 
+  // (Must be called outside the try-catch block for Next.js internal reasons)
+  redirect("/login");
 };
