@@ -21,4 +21,4 @@ export const MAX_FILE_UPLOAD: number = process.env.MAX_FILE_UPLOAD ? parseInt(pr
 // CORS Origins
 export const ALLOWED_ORIGINS: string[] = process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',') 
-    : ["http://localhost:3000", "http://localhost:3001","http://192.168.137.1:3000",'http://10.0.2.2:3000'];
+    : ["http://localhost:3000", "http://localhost:3001", "http://localhost:3004","http://192.168.137.1:3000",'http://10.0.2.2:3000'];

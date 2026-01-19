@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// API layer
-// Call api from backend
-
 import axios from "./axios";
 import { API } from "./endpoints";
 
@@ -25,7 +21,7 @@ export const register = async ( registerData : any ) => {
 export const login = async ( loginData : any ) => {
     try{
         const response = await axios.post(
-            API.AUTH.LOGIN, //path
+            API.AUTH.LOGIN, //path=
             loginData //body data
         );
         return response.data; // what controller from backend sends

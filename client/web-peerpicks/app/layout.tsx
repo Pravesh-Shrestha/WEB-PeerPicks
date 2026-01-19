@@ -12,8 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body 
+        className="antialiased" 
+        suppressHydrationWarning={true} // Add this here
+      > 
         {children}
       </body>
     </html>

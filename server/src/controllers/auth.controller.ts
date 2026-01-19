@@ -28,6 +28,8 @@ async signup(req: Request, res: Response) {
       const result = await authService.login(validatedData);
       res.status(200).json(result);
     } catch (error: any) {
+      console.error("Validation Error Details:", error.errors); 
+      console.log("Login Error:", error.errors);
       res.status(401).json({ error: error.message || "Login failed" });
     }
   }
