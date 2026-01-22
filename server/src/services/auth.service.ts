@@ -41,7 +41,7 @@ export class AuthService {
     const token = jwt.sign(
       { id: user._id, role: user.role }, 
       JWT_SECRET, 
-      { expiresIn: '1d' }
+      { expiresIn: '30d' }
     );
 
     // 4. Return safe user data to the client
@@ -54,5 +54,18 @@ export class AuthService {
         fullName: user.fullName 
       } 
     };
+  }
+
+  async geUserById(userId: string) {
+    if (!userId) throw new Error('User ID is required');
+    const user = await userRepository.getUserById(userId);
+    if (!user) throw new Error('User not found');
+    return {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName
+    };
+
   }
 }
