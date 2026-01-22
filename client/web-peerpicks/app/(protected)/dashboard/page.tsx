@@ -9,6 +9,7 @@ import {
   User, Plus, LogOut, Sun, Moon, 
   MessageSquare, Heart, MapPin, Star, Sparkles, ShieldCheck, CheckCircle2
 } from 'lucide-react';
+import { useAuth } from '@/app/context/AuthContext';
 
 // Server Action for Logout
 import { handleLogout } from '../../../lib/actions/auth-action'; 
@@ -17,6 +18,7 @@ import logoLight from '../../../public/logo2.png';
 import logoDark from '../../../public/logo1.png';  
 
 export default function PeerPicksDashboard() {
+  const {user, logout} = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [activeTab, setActiveTab] = useState('home');
   const [feedSection, setFeedSection] = useState<'for-you' | 'following'>('for-you');
@@ -111,7 +113,7 @@ export default function PeerPicksDashboard() {
                         <Sparkles size={28} />
                       </div>
                       <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white">
-                        Welcome to the <span className="text-[#D4FF33]">Family!</span>
+                        Welcome {user?.fullName} to the <span className="text-[#D4FF33]">Family!</span>
                       </h2>
                     </div>
                     

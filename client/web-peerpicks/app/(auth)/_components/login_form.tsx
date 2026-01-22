@@ -8,8 +8,10 @@ import { useRouter } from "next/navigation";
 import { Mail, Lock, ChevronRight, Eye, EyeOff, CheckCircle2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { handleLogin } from "@/lib/actions/auth-action";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function LoginForm() {
+  const {checkAuth} = useAuth();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
@@ -37,6 +39,9 @@ export default function LoginForm() {
       if (result?.success) {
         setIsSuccess(true);
         setMessage("Login successful! Redirecting...");
+
+        // Refresh Auth Context
+        await checkAuth();
         
         // Logic: Short delay before home
         //  redirect
