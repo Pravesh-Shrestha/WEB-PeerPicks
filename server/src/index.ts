@@ -35,6 +35,8 @@ app.use(cors({
   credentials: true
 }));
 
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // 5. ROBUST SANITIZATION MIDDLEWARE
 // Prevents NoSQL Injection and XSS without breaking Date/Number objects
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -84,7 +86,7 @@ app.get('/', (req, res) => {
 });
 
 // Static files (for profile pictures)
-app.use('/public', express.static(path.join(__dirname, '../public')));
+app.use('/public', express.static(path.join(__dirname, '../uploads')));
 
 // 8. GLOBAL ERROR HANDLER
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

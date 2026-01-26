@@ -64,3 +64,8 @@ export const loginDTO = z.object({
 
 export type SignupDTO = z.infer<typeof signupDTO>;
 export type LoginDTO = z.infer<typeof loginDTO>;
+
+
+export const updateUserDTO = signupDTO.partial();
+
+export type UpdateUserDTO = z.infer<typeof updateUserDTO>;

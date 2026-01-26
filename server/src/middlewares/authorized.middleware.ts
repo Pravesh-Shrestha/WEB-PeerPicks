@@ -27,15 +27,16 @@ export async function authorizedMiddleware(req:Request,res:Response,next:NextFun
         if(!token)
             throw new HttpError(401,'Token missing');
         const decoded=jwt.verify(token,JWT_SECRET) as Record<string,any>;//decoded -> payload
-        if(!decoded || !decoded.userId)
+        if(!decoded || !decoded.id)
             throw new HttpError(401,'Invalid token');
-        const user= await userRepository.getUserById(decoded.userId);//make async if needed
+        const user= await userRepository.getUserById(decoded.id);//make async if needed
         if(!user)
             throw new HttpError(401,'User not found');
         req.user=user;
         return next();
     }
     catch(err){
+        console.log(err)
         return res.status(401).json({message:'Unauthorized'});
     }
             
