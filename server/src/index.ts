@@ -36,7 +36,11 @@ app.use(cors({
   credentials: true
 }));
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res) => {
+    res.set("Cross-Origin-Resource-Policy", "cross-origin");
+  }
+}));
 
 // 5. ROBUST SANITIZATION MIDDLEWARE
 // Prevents NoSQL Injection and XSS without breaking Date/Number objects
@@ -87,8 +91,7 @@ app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: "🚀 PeerPicks API is live" });
 });
 
-// Static files (for profile pictures)
-app.use('/public', express.static(path.join(__dirname, '../uploads')));
+
 
 // 8. GLOBAL ERROR HANDLER
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

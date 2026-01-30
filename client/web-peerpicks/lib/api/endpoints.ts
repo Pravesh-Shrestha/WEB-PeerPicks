@@ -1,6 +1,6 @@
-//List of API endpoints used in the application
+// List of API endpoints used in the application
 
-export const API    = {
+export const API = {
     AUTH: {
         LOGIN: '/api/auth/login',
         REGISTER: '/api/auth/register',
@@ -9,5 +9,6 @@ export const API    = {
     },
     ADMIN: {
         USERS: '/api/admin/users',
+        STATS: '/api/admin/dashboard-stats',
     }
 };
