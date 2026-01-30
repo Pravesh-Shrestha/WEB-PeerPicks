@@ -14,16 +14,11 @@ export class AdminController {
   async getAllUsers(req: Request, res: Response) {
     try {
       const users = await userRepository.getAllUsers();
-      return res.status(200).json({
-        success: true,
-        count: users.length,
-        users,
-      });
-    } catch (error: any) {
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch users",
-      });
+      // Ensure the key is exactly "users"
+      return res.status(200).json({ success: true, users });
+    } catch (error) {
+      const message = (error instanceof Error) ? error.message : "An unexpected error occurred";
+      return res.status(500).json({ success: false, message });
     }
   }
 
@@ -98,4 +93,30 @@ export class AdminController {
       });
     }
   }
+
+    async getUserById(req: Request, res: Response) {
+      try {
+        const userId = req.params.id;
+        if (!userId) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Unauthorized" });
+        }
+        const user = await userRepository.getUserById(userId);
+        return res
+          .status(200)
+          .json({
+            success: true,
+            data: user,
+            message: "User profile fetched successfully",
+          });
+      } catch (error: Error | any) {
+        return res
+          .status(error.statusCode || 500)
+          .json({
+            success: false,
+            message: error.message || "Internal Server Error",
+          });
+      }
+    }
 }

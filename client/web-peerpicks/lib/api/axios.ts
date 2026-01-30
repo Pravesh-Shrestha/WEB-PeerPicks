@@ -11,15 +11,21 @@ const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.request.use(async (config) => {
-    const token= await getAuthToken();
-    if(token&& config.headers){
+    const token = await getAuthToken();
+    if (token && config.headers) {
         config.headers['Authorization'] = `Bearer ${token}`;
     }
     return config;
-},
-(error) => {
-    return Promise.reject(error);
-});
+}, (error) => Promise.reject(error));
 
+axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Logic for unauthorized access
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default axiosInstance;

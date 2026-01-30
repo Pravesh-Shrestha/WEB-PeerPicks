@@ -13,5 +13,5 @@ router.get("/users", protect, isAdmin, (req, res) => adminController.getAllUsers
 router.post("/users", protect, isAdmin, upload.single('profilePicture'), (req, res) => adminController.createUser(req, res));
 router.put("/users/:id", protect, isAdmin, upload.single('profilePicture'), (req, res) => adminController.updateUser(req, res));
 router.delete("/users/:id", protect, isAdmin, (req, res) => adminController.deleteUser(req, res));
-
+router.get('/users/:id', protect, isAdmin, (req, res) => adminController.getUserById(req, res));
 export default router;

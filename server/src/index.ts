@@ -8,6 +8,7 @@ import path from 'path';
 import { connectDB } from './database/database.db';
 import { PORT, ALLOWED_ORIGINS } from './config/index'; 
 import authRoutes from './routes/auth.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app: Application = express();
 
@@ -79,6 +80,7 @@ app.use('/api/', limiter);
 
 // 7. ROUTES
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health Check Route
 app.get('/', (req, res) => {

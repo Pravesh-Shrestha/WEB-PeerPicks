@@ -1,5 +1,8 @@
+import { useRouter } from "next/dist/client/components/navigation";
 import axios from "./axios";
 import { API } from "./endpoints";
+import { clearAuthCookies } from "../cookie";
+import axiosInstance from "./axios";
 
 export const register = async ( registerData : any ) => {
     try{
@@ -82,3 +85,30 @@ export const updateProfile = async (updateData: FormData) => {
         };
     };
 }
+
+export const useLogout = () => {
+    const router = useRouter();
+
+    const logout = () => {
+        // 1. Clear Local Storage (Tokens/UI state)
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        // 2. Clear Cookies (This allows the Middleware to block access)
+        clearAuthCookies();
+
+
+        // 3. Redirect to Login
+        router.push("/login");
+        router.refresh(); // Forces Next.js to re-run middleware
+    };
+
+    return logout;
+};
+
+export const adminUpdateUser = async (id: string, formData: FormData) => {
+    const response = await axiosInstance.put(`${API.ADMIN.USERS}/${id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" } // Overrides default for Multer
+    });
+    return response.data;
+};
