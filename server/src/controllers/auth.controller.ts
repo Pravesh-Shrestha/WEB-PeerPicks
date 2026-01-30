@@ -62,36 +62,34 @@ export class AuthController {
 
   async updateUserProfile(req: Request, res: Response) {
     try {
-      const userId = req.user?._id;
+      // Ensure userId matches your middleware (some use .id, some use ._id)
+      const userId = req.user?._id || req.user?.id; 
+      
       if (!userId) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
+        return res.status(401).json({ success: false, message: "Unauthorized" });
       }
+
       const parsedData = updateUserDTO.safeParse(req.body);
       if (!parsedData.success) {
-        return res
-          .status(400)
-          .json({ success: false, errors: parsedData.error.errors });
+        return res.status(400).json({ success: false, errors: parsedData.error.errors });
       }
+
       if (req.file) {
         parsedData.data.profilePicture = `/uploads/${req.file.filename}`;
       }
+
       const updatedUser = await authService.updateUser(userId, parsedData.data);
-      return res
-        .status(200)
-        .json({
-          success: true,
-          data: updatedUser,
-          message: "User profile updated successfully",
-        });
-    } catch (error: Error | any) {
-      return res
-        .status(error.statusCode || 500)
-        .json({
-          success: false,
-          message: error.message || "Internal Server Error",
-        });
+
+      return res.status(200).json({
+        success: true,
+        user: updatedUser, // Changed from 'data' to 'user' to match frontend result.user
+        message: "User profile updated successfully",
+      });
+    } catch (error: any) {
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Internal Server Error",
+      });
     }
   }
 }

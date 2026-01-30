@@ -1,43 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthToken, getUserData } from "./lib/cookie";
-import { is } from "zod/v4/locales";
 
-const publicPaths = ["/login", "/register", "/forget-password"];
-const adminPaths = ["/admin"];
+// 1. Define your path groups clearly
+const publicPaths = ["/login", "/signup", "/register", "/forget-password",];
+const authRestrictedPaths = ["/admin", "/user", "/dashboard"]; // Pages requiring login
 
 export async function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
 
+    // 2. Get Auth State
     const token = await getAuthToken();
     const user = token ? await getUserData() : null;
 
     const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
-    
-    const isAdminPath = adminPaths.some((path) => pathname.startsWith(path));
+    const isProtectedRoute = authRestrictedPaths.some((path) => pathname.startsWith(path));
 
-    if(!user && !isPublicPath){
+    // 3. LOGIC: If NOT logged in and trying to access protected areas
+    if (!user && isProtectedRoute) {
         return NextResponse.redirect(new URL("/login", req.url));
     }
-    
-    if(user && token){
-        if(isAdminPath && user.role !== 'admin'){
-            return NextResponse.redirect(new URL("/", req.url));
+
+    // 4. LOGIC: If logged in and trying to access public auth pages (Login/Signup)
+    if (user && isPublicPath) {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+
+    // 5. ROLE-BASED ACCESS
+    if (user) {
+        // Protect Admin routes
+        if (pathname.startsWith("/admin") && user.role !== 'admin') {
+            return NextResponse.redirect(new URL("/dashboard", req.url));
+        }
+        
+        // Protect User routes (Admins usually allowed, others not)
+        if (pathname.startsWith("/user") && user.role !== 'user' && user.role !== 'admin') {
+            return NextResponse.redirect(new URL("/dashboard", req.url));
         }
     }
 
-    if (isPublicPath && user) {
-        return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    return NextResponse.next(); // continue/granted
+    return NextResponse.next();
 }
 
+// 6. Updated Matcher: Include EVERYTHING that needs checking
 export const config = {
     matcher: [
+        /*
+         * Match all request paths except for the ones starting with:
+         * - api (API routes)
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         */
+        "/dashboard/:path*",
         "/admin/:path*",
         "/user/:path*",
+        "/update-profile/:path*",
         "/login",
-        "/register"
+        "/signup",
+        "/register",
+        "/forget-password",
     ]
 }
-// matcher - which path to apply proxy logic
