@@ -46,6 +46,9 @@ export const signupDTO = z.object({
     .optional()
     .nullable()
     .or(z.literal("")), // Handles empty strings from web forms
+
+
+  role: z.enum(["user", "admin"]).default("user"),
 });
 
 /**
@@ -66,6 +69,8 @@ export type SignupDTO = z.infer<typeof signupDTO>;
 export type LoginDTO = z.infer<typeof loginDTO>;
 
 
-export const updateUserDTO = signupDTO.partial();
+export const updateUserDTO = signupDTO.partial().extend({
+ role: z.enum(["user", "admin"]).optional(),
+});
 
 export type UpdateUserDTO = z.infer<typeof updateUserDTO>;

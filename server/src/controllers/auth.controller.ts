@@ -5,7 +5,6 @@ import { signupDTO, loginDTO, updateUserDTO } from "../dtos/auth.dto";
 const authService = new AuthService();
 
 export class AuthController {
-  // src/controllers/auth.controller.ts
   async signup(req: Request, res: Response) {
     try {
       const validatedData = signupDTO.parse(req.body);

@@ -1,12 +1,17 @@
-import express from 'express';
-import { protect } from '../middlewares/authorized.middleware';
-import { isAdmin } from '../middlewares/admin.middleware';
-import { getAllUsers, createUser } from '../controllers/auth.controller';
+// src/routes/admin.routes.ts
+import { Router } from "express";
+import { AdminController } from "../controllers/admin.controller";
+import { protect, isAdmin } from "../middlewares/admin.middleware";
+import multer from "multer";
 
-const router = express.Router();
+const router = Router();
+const adminController = new AdminController();
+const upload = multer({ dest: 'uploads/' });
 
-// Apply both: Protect ensures they are logged in, isAdmin ensures they are an admin
-router.get('/users', protect, isAdmin, getAllUsers);
-router.post('/users', protect, isAdmin, createUser);
+
+router.get("/users", protect, isAdmin, (req, res) => adminController.getAllUsers(req, res));
+router.post("/users", protect, isAdmin, upload.single('profilePicture'), (req, res) => adminController.createUser(req, res));
+router.put("/users/:id", protect, isAdmin, upload.single('profilePicture'), (req, res) => adminController.updateUser(req, res));
+router.delete("/users/:id", protect, isAdmin, (req, res) => adminController.deleteUser(req, res));
 
 export default router;
