@@ -41,12 +41,9 @@ export const signupDTO = z.object({
     .regex(/^[0-9+]+$/, "Phone must contain only numbers and +"),
 
   profilePicture: z
-    .string()
-    .url("Invalid URL format")
-    .optional()
-    .nullable()
-    .or(z.literal("")), // Handles empty strings from web forms
-
+  .string()
+  .optional()
+  .transform(val => (val === "" || val === null ? undefined : val)),
 
   role: z.enum(["user", "admin"]).default("user"),
 });

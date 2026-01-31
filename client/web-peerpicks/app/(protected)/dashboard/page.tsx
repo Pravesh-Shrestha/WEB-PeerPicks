@@ -44,10 +44,25 @@ export default function PeerPicksDashboard() {
     localStorage.setItem('peerpicks-theme', newTheme);
   };
 
-  const onLogout = async () => {
+const onLogout = async () => {
+  try {
+    // 1. Execute server-side logout action
     await handleLogout();
-    window.location.href = '/login';
-  };
+
+    // 2. Clear client-side data
+    localStorage.removeItem("peerpicks-theme");
+    // Cookies are usually cleared by the handleLogout action via 'Set-Cookie' header,
+    // but if you are using manual cookies:
+    document.cookie =
+      "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+    // 3. Wipe and redirect
+    window.location.href = "/login";
+  } catch (error) {
+    console.error("Logout failed:", error);
+    window.location.href = "/login"; // Force redirect anyway
+  }
+};
 
   const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'Peer';
 

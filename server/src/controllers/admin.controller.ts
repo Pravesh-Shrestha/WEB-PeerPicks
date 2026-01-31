@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import { UserRepository } from "../repositories/user.repository";
-import { updateUserDTO } from "../dtos/auth.dto"; // Reusing your DTOs
+import { signupDTO, updateUserDTO } from "../dtos/auth.dto"; // Reusing your DTOs
 import { HttpError } from "../errors/http-error";
 import { UserModel } from "../models/user.model";
+import bcrypt from "bcryptjs";
 // Instantiate the repository
 const userRepository = new UserRepository();
 
@@ -27,19 +28,36 @@ export class AdminController {
    */
   async createUser(req: Request, res: Response) {
     try {
-      // Use req.body directly or create a specific adminCreateUserDTO
-      const userData = req.body;
+      const parsed = signupDTO.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, errors: parsed.error.errors });
+      }
 
+      // 1. Hash the password manually
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(parsed.data.password, salt);
+
+      // 2. Map data and fix the TypeScript 'null' vs 'undefined' error
+      const userData = {
+        ...parsed.data,
+        password: hashedPassword, // Use the hash, not plain text
+        profilePicture: parsed.data.profilePicture ?? undefined, // Fixes TS2345
+      };
+
+      // 3. Handle file
       if (req.file) {
         userData.profilePicture = `/uploads/${req.file.filename}`;
       }
 
-      const user = await userRepository.create(userData);
-      res
-        .status(201)
-        .json({ success: true, message: "User created by Admin", user });
+      const user = await userRepository.create(userData as any);
+      
+      return res.status(201).json({ 
+        success: true, 
+        message: "User created and password hashed", 
+        user 
+      });
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
