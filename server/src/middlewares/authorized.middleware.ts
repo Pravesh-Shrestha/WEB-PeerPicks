@@ -19,24 +19,29 @@ declare global{
 
 export async function authorizedMiddleware(req:Request,res:Response,next:NextFunction){
 //     //express function can have next function to go next
-    try{
-        const authHeader=req.headers.authorization;
-        if(!authHeader || !authHeader.startsWith('Bearer '))//"Bearer <token" 0 -> Bearer 1-> token
-            throw new HttpError(401,'Authorization header missing or malformed');
-        const token=authHeader.split(' ')[1];
-        if(!token)
-            throw new HttpError(401,'Token missing');
-        const decoded=jwt.verify(token,JWT_SECRET) as Record<string,any>;//decoded -> payload
-        if(!decoded || !decoded.userId)
-            throw new HttpError(401,'Invalid token');
-        const user= await userRepository.getUserById(decoded.userId);//make async if needed
-        if(!user)
-            throw new HttpError(401,'User not found');
-        req.user=user;
-        return next();
-    }
-    catch(err){
-        return res.status(401).json({message:'Unauthorized'});
+    try {
+     console.log("DEBUG: Incoming Header ->", req.headers.authorization);
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer "))
+        //"Bearer <token" 0 -> Bearer 1-> token
+        throw new HttpError(401, "Authorization header missing or malformed");
+      const token = authHeader.split(" ")[1];
+      if (!token) throw new HttpError(401, "Token missing");
+      const decoded = jwt.verify(token, JWT_SECRET) as Record<string, any>; //decoded -> payload
+      if (!decoded || !decoded.id) throw new HttpError(401, "Invalid token");
+      const user = await userRepository.getUserById(decoded.id); //make async if needed
+      if (!user) throw new HttpError(401, "User not found");
+      req.user = user;
+      return next();
+    } catch (err: any) {
+      console.log("Auth Middleware Error:", err.message); // Log the specific error
+      return res.status(401).json({
+        success: false,
+        message:
+          err.name === "JsonWebTokenError"
+            ? "Invalid or Malformed Token"
+            : err.message || "Unauthorized",
+      });
     }
             
 //     if(req.headers&& req.headers.authorization){

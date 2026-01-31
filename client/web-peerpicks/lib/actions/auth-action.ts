@@ -1,10 +1,11 @@
 "use server";
 
-import { register, login } from '../api/auth';
+import { register, login, whoami, updateProfile } from '../api/auth';
 import { SignupData } from '../../app/(auth)/schema'; 
 import { setAuthToken, setUserData } from '../cookie';
 import { redirect } from 'next/navigation';
 import { clearAuthCookies } from "../cookie";
+import { revalidatePath } from 'next/cache';
 /**
  * Handles the Registration Logic
  */
@@ -116,3 +117,39 @@ export const handleLogout = async () => {
   // (Must be called outside the try-catch block for Next.js internal reasons)
   redirect("/login");
 };
+
+export const handleWhoAmI = async () => {
+  try {
+    const response = await whoami();
+    return response;
+  } catch (error: any) {
+    console.error("WhoAmI Server Error:", error);
+    return { 
+      success: false, 
+      message: error.message || 'An unexpected error occurred' 
+    };
+  }
+};
+
+
+export const handleUpdateProfile = async (formData: any) => {
+    try{
+        const result = await updateProfile(formData);
+        if(result.success){
+            // update cookie data
+            await setUserData(result.data);
+            // optionally revalidate path(s)
+            revalidatePath("/user/profile");
+            return {
+                success: true,
+                message: "Profile updated successfully",
+                data: result.data 
+            };
+        }
+        return {
+            success: false, message: result.message || "Failed to update profile"
+        }
+    }catch(err: Error | any){
+        return { success: false, message: err.message || "Failed to update profile"};
+    }
+}

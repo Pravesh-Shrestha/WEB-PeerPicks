@@ -8,6 +8,7 @@ import path from 'path';
 import { connectDB } from './database/database.db';
 import { PORT, ALLOWED_ORIGINS } from './config/index'; 
 import authRoutes from './routes/auth.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app: Application = express();
 
@@ -33,6 +34,12 @@ app.use(cors({
     }
   },
   credentials: true
+}));
+
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res) => {
+    res.set("Cross-Origin-Resource-Policy", "cross-origin");
+  }
 }));
 
 // 5. ROBUST SANITIZATION MIDDLEWARE
@@ -77,14 +84,14 @@ app.use('/api/', limiter);
 
 // 7. ROUTES
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health Check Route
 app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: "🚀 PeerPicks API is live" });
 });
 
-// Static files (for profile pictures)
-app.use('/public', express.static(path.join(__dirname, '../public')));
+
 
 // 8. GLOBAL ERROR HANDLER
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

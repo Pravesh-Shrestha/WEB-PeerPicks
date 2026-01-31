@@ -41,11 +41,11 @@ export const signupDTO = z.object({
     .regex(/^[0-9+]+$/, "Phone must contain only numbers and +"),
 
   profilePicture: z
-    .string()
-    .url("Invalid URL format")
-    .optional()
-    .nullable()
-    .or(z.literal("")), // Handles empty strings from web forms
+  .string()
+  .optional()
+  .transform(val => (val === "" || val === null ? undefined : val)),
+
+  role: z.enum(["user", "admin"]).default("user"),
 });
 
 /**
@@ -64,3 +64,10 @@ export const loginDTO = z.object({
 
 export type SignupDTO = z.infer<typeof signupDTO>;
 export type LoginDTO = z.infer<typeof loginDTO>;
+
+
+export const updateUserDTO = signupDTO.partial().extend({
+ role: z.enum(["user", "admin"]).optional(),
+});
+
+export type UpdateUserDTO = z.infer<typeof updateUserDTO>;

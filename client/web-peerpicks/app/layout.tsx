@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "./context/AuthContext";
+import {ToastContainer} from 'react-toastify';
 
 export const metadata: Metadata = {
   title: "PeerPicks",
@@ -15,9 +17,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body 
         className="antialiased" 
-        suppressHydrationWarning={true} // Add this here
-      > 
-        {children}
+        suppressHydrationWarning={true}>
+          <AuthProvider>
+             {children}
+            <ToastContainer position="top-right"/>
+            </AuthProvider> 
       </body>
     </html>
   );

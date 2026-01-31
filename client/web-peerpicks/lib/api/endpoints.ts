@@ -1,8 +1,14 @@
-//List of API endpoints used in the application
+// List of API endpoints used in the application
 
-export const API    = {
+export const API = {
     AUTH: {
         LOGIN: '/api/auth/login',
         REGISTER: '/api/auth/register',
+        WHOAMI: '/api/auth/whoami',
+        UPDATEPROFILE: '/api/auth/update-profile',
+    },
+    ADMIN: {
+        USERS: '/api/admin/users',
+        STATS: '/api/admin/dashboard-stats',
     }
 };

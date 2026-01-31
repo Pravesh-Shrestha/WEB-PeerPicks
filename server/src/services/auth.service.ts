@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserRepository } from '../repositories/user.repository';
-import { SignupDTO, LoginDTO } from '../dtos/auth.dto';
+import { SignupDTO, LoginDTO, UpdateUserDTO } from '../dtos/auth.dto';
 import { JWT_SECRET } from '../config/index';
+import { HttpError } from '../errors/http-error';
 
 const userRepository = new UserRepository();
 
@@ -26,33 +27,80 @@ export class AuthService {
       profilePicture: userData.profilePicture || undefined
     };
     return await userRepository.create(userDataToCreate);
+  } 
+
+async login(data: LoginDTO) {
+  const user = await userRepository.findByEmail(data.email);
+  
+  if (!user || !(await bcrypt.compare(data.password, user.password))) {
+    throw new Error('Invalid credentials');
   }
 
-  async login(data: LoginDTO) {
-    // 1. Find user by email
-    const user = await userRepository.findByEmail(data.email);
-    
-    // 2. Verify existence and password match
-    if (!user || !(await bcrypt.compare(data.password, user.password))) {
-      throw new Error('Invalid credentials');
-    }
+  const token = jwt.sign(
+    { id: user._id, role: user.role }, 
+    JWT_SECRET, 
+    { expiresIn: '30d' }
+  );
 
-    // 3. Generate JWT (using the secret from your .env config)
-    const token = jwt.sign(
-      { id: user._id, role: user.role }, 
-      JWT_SECRET, 
-      { expiresIn: '1d' }
-    );
+  return { 
+    token, 
+    user: { 
+      id: user._id,
+      email: user.email, 
+      role: user.role,
+      fullName: user.fullName,
+      dob: user.dob,
+      profilePicture: user.profilePicture 
+    } 
+  };
+}
 
-    // 4. Return safe user data to the client
-    return { 
-      token, 
-      user: { 
-        id: user._id,
-        email: user.email, 
-        role: user.role,
-        fullName: user.fullName 
-      } 
+  async geUserById(userId: string) {
+    if (!userId) throw new Error('User ID is required');
+    const user = await userRepository.getUserById(userId);
+    if (!user) throw new Error('User not found');
+    return {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName,
+      // ADD THESE FIELDS:
+      dob: user.dob,
+      profilePicture: user.profilePicture
     };
   }
+
+  async getUserByEmail(email: string) {
+    if (!email) throw new Error('Email is required');
+    const user = await userRepository.findByEmail(email);
+    if (!user) throw new Error('User not found');
+    return {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName,
+      // ADD THESE FIELDS:
+      dob: user.dob,
+      profilePicture: user.profilePicture
+    };
+  }
+async updateUser(userId: string, data: UpdateUserDTO){
+        const user = await userRepository.getUserById(userId);
+        if(!user){
+            throw new HttpError(404, "User not found");
+        }
+        if(user.email !== data.email){
+            const emailExists = await userRepository.findByEmail(data.email!);
+            if(emailExists){
+                throw new HttpError(409, "Email already exists");
+            }
+        }
+        if(data.password){
+            const hashedPassword = await bcrypt.hash(data.password, 10);
+            data.password = hashedPassword;
+        }
+        const updatedUser = await userRepository.updateUser(userId, data);
+        return updatedUser;
+    }
+
 }
