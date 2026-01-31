@@ -1,13 +1,96 @@
-PeerPicks Admin Dashboard | Project READMEThis project is a high-performance Admin Management System built with a modern tech stack. It features a robust Node.js/Express backend with strict Zod validation and a Next.js frontend styled with Tailwind CSS and Framer Motion.🚀 Tech StackFrontendFramework: Next.js 14+ (App Router)Styling: Tailwind CSS (Dark Theme optimized)Animations: Framer MotionIcons: Lucide ReactForm Handling: Axios for multipart/form-data (image uploads)BackendRuntime: Node.js / Express.jsDatabase: MongoDB via MongooseValidation: Zod (Schema-based DTOs)Security: Bcrypt (Password Hashing), JWT AuthenticationFile Handling: Multer (Local storage for profile pictures)🛠 Features1. Advanced User ManagementCRUD Operations: Create, Read, Update, and Delete users directly from the admin panel.Role-Based Access: Automatic defaulting to user role with the ability for Admins to escalate permissions.Age Validation: Integrated Zod logic ensures all users are at least 13 years old based on their Date of Birth.2. Secure AuthenticationAutomated Hashing: All passwords created via the Admin panel are hashed using bcrypt (10 salts) before being stored in the database.Data Integrity: Unique email indexing and case-insensitive normalization.3. Multimedia SupportProfile Pictures: Support for image uploads via multipart/form-data.Static Serving: Images are stored in /uploads and served statically for high-speed retrieval.4. High-End UI/UXResponsive Forms: Mobile-first grid layouts for complex data entry (e.g., Gender and DOB side-by-side).Dark Mode UI: Custom [color-scheme:dark] integration for native browser elements like Date Pickers.📂 Project StructurePlaintext├── backend
-│   ├── src
-│   │   ├── controllers     # Admin & Auth logic
-│   │   ├── dtos            # Zod validation schemas
-│   │   ├── models          # Mongoose User schemas
-│   │   ├── repositories    # Database abstraction layer
-│   │   └── routes          # API endpoints
-│   └── uploads             # Local image storage
-├── frontend
-│   ├── app
-│   │   ├── admin           # Dashboard & User Management
-│   │   └── components      # Reusable UI elements
-⚙️ Installation & SetupClone the RepositoryConfigure Backend:Create an uploads/ folder in the backend root.Set up your .env with MONGODB_URI and PORT.Run npm install and npm run dev.Configure Frontend:Run npm install.Set your API_URL in the config file.Run npm run dev.🛡 API EndpointsMethodEndpointDescriptionGET/api/admin/usersFetch all users & dashboard statsPOST/api/admin/usersCreate new user with image uploadPUT/api/admin/users/:idUpdate user details/profile pictureDELETE/api/admin/users/:idPurge user from the system
+# PeerPicks Admin Dashboard 🚀
+
+A professional-grade User Management & Identity Synchronization system built for the PeerPicks ecosystem. This application provides administrators with a high-fidelity interface to manage peer accounts, monitor system-wide activity, and ensure data integrity across the platform.
+
+---
+
+## 🛠 Tech Stack
+
+### Frontend (Peer Interface)
+* **Framework:** Next.js 14+ (App Router & Turbopack)
+- **Animations:** Framer Motion for high-end transitions
+- **Styling:** Tailwind CSS (Optimized for Dark Mode)
+- **Icons:** Lucide React
+- **State & Data:** Axios with Multipart/Form-Data support
+
+### Backend (Core Logic)
+- **Runtime:** Node.js / Express.js
+- **Database:** MongoDB via Mongoose
+- **Validation:** Zod (Type-safe DTOs and Data Coercion)
+- **Security:** Bcrypt (10-round salt hashing)
+- **File System:** Multer for local profile picture storage
+
+---
+
+## ✨ Features
+
+### 1. Robust User Management
+- **Full CRUD:** Create, Read, Update, and Delete peers with real-time synchronization.
+- **Identity Verification:** Zod-powered validation ensures unique emails, valid phone formats, and correct gender enums.
+- **Age Governance:** Integrated age calculation logic ensures all registered peers are **13 years or older**.
+
+### 2. High-Fidelity UI/UX
+- **Responsive Grids:** Optimized forms for Gender and Date of Birth entry.
+- **Native Dark Elements:** Custom `[color-scheme:dark]` utility ensures date pickers and selects match the dashboard aesthetic.
+- **Real-time Feedback:** Framer Motion labels and input transitions.
+
+### 3. Enterprise Security
+- **Automated Hashing:** All passwords created via the Admin panel are manually hashed using `bcrypt` before database persistence.
+- **Type Safety:** TypeScript integration across controllers and repositories to prevent runtime failures.
+
+---
+
+## 📂 Project Structure
+
+├── server/
+│   ├── src/
+│   │   ├── controllers/    # AdminController logic (Hashing & Parsing)
+│   │   ├── dtos/           # Zod Data Transfer Objects
+│   │   ├── models/         # Mongoose schemas (IUser interface)
+│   │   ├── repositories/   # Database abstraction layer
+│   │   └── routes/         # Express API endpoints
+│   └── uploads/            # Static storage for profile pictures
+├── client/
+│   ├── app/
+│   │   ├── admin/          # Dashboard & User Management pages
+│   │   └── components/     # UI components (Framer-motion optimized)
+
+
+## ⚙️ Setup & Installation
+
+### Backend Setup
+
+1. Navigate to `/server` and run `npm install`.
+2. Create an `.env` file with `MONGODB_URI`, `PORT`, and `JWT_SECRET`.
+3. **Crucial:** Create a folder named `uploads` in the root of the server directory to handle Multer storage.
+4. Run `npm run dev`.
+
+### Frontend Setup
+
+1. Navigate to `/client` and run `npm install`.
+2. Ensure your API endpoint matches the server's local address.
+3. Run `npm run dev`.
+
+---
+
+## 🛡 API Endpoints (Admin Only)
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| **GET** | `/api/admin/users` | Fetch all peers and dashboard statistics. |
+| **POST** | `/api/admin/users` | Create new peer (Accepts Multipart/Form-Data). |
+| **PUT** | `/api/admin/users/:id` | Update peer details and profile images. |
+| **DELETE** | `/api/admin/users/:id` | Purge peer identity from the database. |
+
+---
+
+## 📝 Developer Notes
+
+* **Password Handling:** The system uses `bcrypt.genSalt(10)` to secure passwords during the admin creation process.
+* **Date Handling:** Frontend strings are converted to JavaScript Date objects using `z.coerce.date()` on the backend.
+* **Static Assets:** To view profile pictures, the Express app serves the `uploads` folder via `express.static('uploads')`.
+
+---
+
+© 2026 PeerPicks Development Team
+```
