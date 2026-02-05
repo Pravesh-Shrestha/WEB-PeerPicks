@@ -112,3 +112,24 @@ export const adminUpdateUser = async (id: string, formData: FormData) => {
     });
     return response.data;
 };
+export const requestPasswordReset = async (email: string) => {
+    try {
+        const response = await axios.post(API.AUTH.REQUEST_PASSWORD_RESET, { email });
+        return response.data;
+    } catch (error: Error | any) {
+        throw new Error(error.response?.data?.message || error.message || 'Request password reset failed');
+    }
+};
+
+
+export const resetPassword = async (token: string, newPassword: string) => {
+    try {
+        // Use axiosInstance so it hits http://localhost:3000 automatically
+        const response = await axiosInstance.post(API.AUTH.RESET_PASSWORD(token), { 
+            newPassword: newPassword 
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || 'Reset password failed');
+    }
+};

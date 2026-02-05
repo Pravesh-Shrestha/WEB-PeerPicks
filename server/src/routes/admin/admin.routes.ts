@@ -1,7 +1,7 @@
 // src/routes/admin.routes.ts
 import { Router } from "express";
-import { AdminController } from "../controllers/admin.controller";
-import { protect, isAdmin } from "../middlewares/admin.middleware";
+import { AdminController } from "../../controllers/admin/admin.controller";
+import { protect, isAdmin } from "../../middlewares/admin.middleware";
 import multer from "multer";
 
 const router = Router();

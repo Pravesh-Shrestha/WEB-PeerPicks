@@ -14,6 +14,8 @@ router.get("/whoami", authorizedMiddleware, authController.getUserProfile);
 
 router.put("/update-profile", authorizedMiddleware, uploads.single('profilePicture'), authController.updateUserProfile);
 
+router.post("/request-password-reset", authController.sendResetPasswordEmail);
+router.post("/reset-password/:token", authController.resetPassword);
 
 
 

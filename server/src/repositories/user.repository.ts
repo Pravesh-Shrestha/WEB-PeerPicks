@@ -56,4 +56,8 @@ export class UserRepository implements IUserRepository {
     // Exclude password for security
     return await UserModel.find().select("-password").sort({ createdAt: -1 });
   }
+
+  async getUserByEmail(email: string): Promise<IUser | null> {
+    return await UserModel.findOne({ email });
+  }
 }

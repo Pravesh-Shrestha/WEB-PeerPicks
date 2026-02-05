@@ -122,7 +122,7 @@ export default function LoginForm() {
         </fieldset>
 
         <div className="flex justify-end">
-          <Link href="#" className="text-[10px] text-slate-500 hover:text-white transition-colors font-medium">
+          <Link href="/forget_password" className="text-[10px] text-slate-500 hover:text-white transition-colors font-medium">
             Forgot password?
           </Link>
         </div>

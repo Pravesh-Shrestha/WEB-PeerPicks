@@ -20,6 +20,7 @@ interface DashboardData {
     fullName: string;
     updatedAt: string;
     role: string;
+    profilePicture?: string;
   }>;
 }
 
@@ -189,51 +190,66 @@ export default function AdminDashboard() {
 
         <div className="space-y-3 sm:space-y-4 relative">
           <AnimatePresence mode="popLayout">
-            {data?.recentActivity && data.recentActivity.length > 0 ? (
-              data.recentActivity.map((user, index) => (
-                <motion.div
-                  key={user._id}
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 20, opacity: 0 }}
-                  transition={{ delay: 0.5 + index * 0.05, duration: 0.3, ease: "easeOut" }}
-                  whileHover={{ x: 5, scale: 1.01 }}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-3 sm:pb-4 last:border-b-0 gap-2 sm:gap-0 group"
-                >
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <motion.div
+                          {data?.recentActivity && data.recentActivity.length > 0 ? (
+                data.recentActivity.map((user, index) => (
+                  <motion.div
+                    key={user._id}
+                    // ... your existing motion props ...
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-3 sm:pb-4 last:border-b-0 gap-2 sm:gap-0 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Profile Image Container */}
+                      <motion.div 
+                        className="relative flex-shrink-0"
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        transition={{ delay: 0.55 + index * 0.05, type: "spring", stiffness: 300 }}
-                        className="w-2 h-2 rounded-full bg-[#D4FF33] group-hover:scale-125 transition-transform"
-                      />
-                      <span className="text-xs sm:text-sm text-gray-300">
-                        Modified Peer: <span className="text-white font-bold italic">{user.fullName}</span>
+                        transition={{ delay: 0.5 + index * 0.05 }}
+                      >
+                        {user.profilePicture ? (
+                          <div className="relative">
+                            <img 
+                              src={`${process.env.NEXT_PUBLIC_API_URL}${user.profilePicture}`} 
+                              alt={user.fullName}
+                              className="w-10 h-10 rounded-xl object-cover border border-white/10 group-hover:border-[#D4FF33]/50 transition-colors shadow-lg"
+                            />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#D4FF33] border-2 border-[#0B0C10] rounded-full" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5D44F8] to-[#1a1d29] flex items-center justify-center border border-white/10 group-hover:border-[#D4FF33]/50 transition-all shadow-lg">
+                            <Users size={18} className="text-white/50" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-gray-500 border-2 border-[#0B0C10] rounded-full" />
+                          </div>
+                        )}
+                      </motion.div>
+
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs sm:text-sm text-gray-300">
+                            Modified Peer: <span className="text-white font-bold italic tracking-tight">{user.fullName}</span>
+                          </span>
+                        </div>
+                        <span className="text-[9px] sm:text-[10px] text-gray-600 font-mono">
+                          ID: {user._id.substring(0, 16)}...
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-left sm:text-right ml-[52px] sm:ml-0">
+                      <motion.span 
+                        // ... your existing status props ...
+                        className="text-[9px] sm:text-[10px] text-[#D4FF33] flex sm:justify-end items-center gap-1.5 font-bold mb-1"
+                      >
+                        <CheckCircle2 size={12} />
+                        SYNC_COMPLETE
+                      </motion.span>
+                      <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase flex items-center gap-1.5">
+                        <Zap size={10} className="text-gray-600" />
+                        {new Date(user.updatedAt).toLocaleTimeString()}
                       </span>
                     </div>
-                    <span className="text-[9px] sm:text-[10px] text-gray-600 font-mono ml-4">
-                      ID: {user._id.substring(0, 16)}...
-                    </span>
-                  </div>
-                  <div className="text-left sm:text-right ml-4 sm:ml-0">
-                    <motion.span 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.6 + index * 0.05 }}
-                      className="text-[9px] sm:text-[10px] text-[#D4FF33] flex sm:justify-end items-center gap-1.5 font-bold mb-1"
-                    >
-                      <CheckCircle2 size={12} />
-                      SYNC_COMPLETE
-                    </motion.span>
-                    <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase flex items-center gap-1.5">
-                      <Zap size={10} className="text-gray-600" />
-                      {new Date(user.updatedAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                </motion.div>
-              ))
-            ) : (
+                  </motion.div>
+                ))
+              ) : (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

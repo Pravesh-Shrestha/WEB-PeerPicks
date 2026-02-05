@@ -1,6 +1,6 @@
 "use server";
 
-import { register, login, whoami, updateProfile } from '../api/auth';
+import { register, login, whoami, updateProfile,requestPasswordReset,resetPassword } from '../api/auth';
 import { SignupData } from '../../app/(auth)/schema'; 
 import { setAuthToken, setUserData } from '../cookie';
 import { redirect } from 'next/navigation';
@@ -51,35 +51,16 @@ export const handleLogin = async (data: { email: string; password: string }) => 
   console.log("Login Payload:", { email: data.email, password: "[HIDDEN]" });
 
   try {
-    const result = await login(data);
-    
-    // Log the full result to track API changes
-    console.log("API Response Result:", result);
+// auth-action.ts
+const result = await login(data);
 
-    /**
-     * LOGIC FIX: 
-     * Your API returns { token, user }. 
-     * We check for 'token' because 'success' was undefined in your logs.
-     */
-    if (result && (result.token || result.success)) {
-      console.log("Login Success: Token received.");
-
-      // 1. Save the JWT Token to cookies
-      await setAuthToken(result.token);
-
-      // 2. Save User Profile Data to cookies
-      // Based on your logs, data is in 'result.user'
-      const userData = result.user || result.data;
-      await setUserData(userData);
-      
-      console.log("Auth Cookies set for user:", userData?.email);
-
-      return {
-        success: true,
-        message: 'Login successful',
-        data: userData
-      };
-    }
+// FIX: Check for token since your backend doesn't send a 'success' boolean
+if (result && result.token) { 
+  await setAuthToken(result.token);
+  const userData = result.user;
+  await setUserData(userData);
+  return { success: true, message: 'Login successful', data: userData };
+}
 
     // Handle case where API responds but credentials might be wrong
     console.warn("Login Failed - No token provided in response");
@@ -153,3 +134,33 @@ export const handleUpdateProfile = async (formData: any) => {
         return { success: false, message: err.message || "Failed to update profile"};
     }
 }
+
+export const handleRequestPasswordReset = async (email: string) => {
+    try {
+        const response = await requestPasswordReset(email);
+        if (response.success) {
+            return {
+                success: true,
+                message: 'Password reset email sent successfully'
+            }
+        }
+        return { success: false, message: response.message || 'Request password reset failed' }
+    } catch (error: Error | any) {
+        return { success: false, message: error.message || 'Request password reset action failed' }
+    }
+};
+
+export const handleResetPassword = async (token: string, newPassword: string) => {
+    try {
+        const response = await resetPassword(token, newPassword);
+        if (response.success) {
+            return {
+                success: true,
+                message: 'Password has been reset successfully'
+            }
+        }
+        return { success: false, message: response.message || 'Reset password failed' }
+    } catch (error: Error | any) {
+        return { success: false, message: error.message || 'Reset password action failed' }
+    }
+};

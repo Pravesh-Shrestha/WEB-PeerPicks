@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import { UserRepository } from "../repositories/user.repository";
-import { signupDTO, updateUserDTO } from "../dtos/auth.dto"; // Reusing your DTOs
-import { HttpError } from "../errors/http-error";
-import { UserModel } from "../models/user.model";
+import { UserRepository } from "../../repositories/user.repository";
+import { signupDTO, updateUserDTO } from "../../dtos/auth.dto"; // Reusing your DTOs
+import { HttpError } from "../../errors/http-error";
+import { UserModel } from "../../models/user.model";
 import bcrypt from "bcryptjs";
 // Instantiate the repository
 const userRepository = new UserRepository();
@@ -64,57 +64,58 @@ export class AdminController {
   /**
    * Admin can update ANY user profile by ID
    */
-  async updateUser(req: Request, res: Response) {
-    try {
-      const { id } = req.params; // The ID of the user being edited, not the Admin
+  // Inside AdminController class
 
-      const parsedData = updateUserDTO.safeParse(req.body);
-      if (!parsedData.success) {
-        return res
-          .status(400)
-          .json({ success: false, errors: parsedData.error.errors });
-      }
-
-      if (req.file) {
-        parsedData.data.profilePicture = `/uploads/${req.file.filename}`;
-      }
-
-      const updatedUser = await userRepository.updateUser(id, parsedData.data);
-
-      return res.status(200).json({
-        success: true,
-        user: updatedUser,
-        message: "Peer identity synchronized successfully",
-      });
-    } catch (error: any) {
-      return res.status(error.statusCode || 500).json({
-        success: false,
-        message: error.message,
-      });
+async updateUser(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const parsedData = updateUserDTO.safeParse(req.body);
+    
+    if (!parsedData.success) {
+      return res.status(400).json({ success: false, errors: parsedData.error.errors });
     }
-  }
 
-  /**
-   * Delete user from system
-   */
-  async deleteUser(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const deletedUser = await userRepository.deleteUser(id);
+    const updatePayload: any = { ...parsedData.data };
 
-      if (!deletedUser) throw new HttpError(404, "User not found");
-
-      return res.status(200).json({
-        success: true,
-        message: `User ${id} successfully purged from system`,
-      });
-    } catch (error: any) {
-      return res.status(error.statusCode || 500).json({
-        success: false,
-        message: error.message,
-      });
+    // FIX: Hash the password if the Admin provided a new one
+    if (updatePayload.password && updatePayload.password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      updatePayload.password = await bcrypt.hash(updatePayload.password, salt);
+    } else {
+      // Avoid overwriting with an empty string if blank
+      delete updatePayload.password;
     }
+
+    if (req.file) {
+      updatePayload.profilePicture = `/uploads/${req.file.filename}`;
+    }
+
+    const updatedUser = await userRepository.updateUser(id, updatePayload);
+    return res.status(200).json({ success: true, user: updatedUser, message: "Peer identity synchronized" });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message });
   }
+}
+
+async deleteUser(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const deletedUser = await userRepository.deleteUser(id);
+
+    if (!deletedUser) throw new HttpError(404, "User not found");
+
+    return res.status(200).json({
+      success: true,
+      // Terminology updated from "purged" to "deleted"
+      message: `User ${id} successfully deleted from system`,
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}
 
   async getUserById(req: Request, res: Response) {
     try {
