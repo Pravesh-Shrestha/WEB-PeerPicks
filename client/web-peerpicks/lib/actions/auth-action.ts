@@ -152,15 +152,26 @@ export const handleRequestPasswordReset = async (email: string) => {
 
 export const handleResetPassword = async (token: string, newPassword: string) => {
     try {
-        const response = await resetPassword(token, newPassword);
+        // FIX: Remove "token=" prefix and decode the URL string
+        const cleanToken = decodeURIComponent(token).replace(/^token=/, '');
+        
+        const response = await resetPassword(cleanToken, newPassword);
+        
         if (response.success) {
             return {
                 success: true,
                 message: 'Password has been reset successfully'
             }
         }
-        return { success: false, message: response.message || 'Reset password failed' }
-    } catch (error: Error | any) {
-        return { success: false, message: error.message || 'Reset password action failed' }
+        
+        return { 
+            success: false, 
+            message: response.message || 'Reset password failed' 
+        }
+    } catch (error: any) {
+        return { 
+            success: false, 
+            message: error.message || 'Reset password action failed' 
+        }
     }
 };

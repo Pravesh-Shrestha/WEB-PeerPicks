@@ -1,4 +1,4 @@
-// app/(auth)/reset-password/page.tsx
+// app/(auth)/reset-password/[token]/page.tsx
 import ResetPasswordForm from "../../_components/reset_password_form"
 
 export default async function ResetPasswordPage({ 
@@ -6,18 +6,17 @@ export default async function ResetPasswordPage({
 }: { 
     params: Promise<{ token: string }> 
 }) {
-    // You MUST await params to get the token safely
-    const resolvedParams = await params;
-    const token = resolvedParams.token;
+    const { token } = await params;
 
-    return (
-        <div className="flex min-h-screen items-center justify-center bg-[#050505] p-4">
-            {/* If token is missing here, the form gets "undefined" */}
-            {token ? (
-                <ResetPasswordForm token={token} />
-            ) : (
-                <div className="text-white">Invalid or missing token in URL.</div>
-            )}
-        </div>
-    );
+    if (!token) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center">
+                <p className="text-red-500 font-bold uppercase text-[10px] tracking-widest">Protocol Error</p>
+                <p className="text-slate-500 text-xs mt-1">Security token is missing from the URL.</p>
+            </div>
+        );
+    }
+
+    // No extra divs here. AuthLayout handles centering and the dark background.
+    return <ResetPasswordForm token={token} />;
 }

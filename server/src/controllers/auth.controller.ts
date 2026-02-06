@@ -93,17 +93,24 @@ export class AuthController {
   }
 
   async sendResetPasswordEmail(req: Request, res: Response) {
-        try {
-            const email = req.body.email;
-            const user = await authService.sendResetPasswordEmail(email);
-            return res.status(200).json(
-                { success: true,
-                    data: user,
-                    message: "If the email is registered, a reset link has been sent." });
-            } catch (error: Error | any) {
-                return res.status(error.statusCode ?? 500).json(
-                    { success: false, message: error.message || "Internal Server Error" });
-        }
+      try {
+          const { email } = req.body;
+          // We don't wait for the actual email to send before responding to prevent timing attacks,
+          // but for now, we'll keep the await for simplicity.
+          await authService.sendResetPasswordEmail(email);
+          
+          return res.status(200).json({ 
+              success: true,
+              message: "If an account exists with this email, a reset link has been sent." 
+          });
+      } catch (error: any) {
+          // Log the error internally, but don't leak DB details to the user
+          console.error("Reset Email Error:", error);
+          return res.status(error.statusCode ?? 500).json({ 
+              success: false, 
+              message: "An error occurred while processing your request." 
+          });
+      }
   }
 
     async resetPassword(req: Request, res: Response) {
