@@ -1,5 +1,6 @@
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin/admin.routes';
+import pickRoutes from './routes/pick.route';
 import blog from './routes/blog.route';
 import adminBlogRouter from './routes/admin/blog.route';
 import express, { Application, Request, Response, NextFunction } from 'express';
@@ -41,36 +42,47 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 
 // 5. ROBUST SANITIZATION MIDDLEWARE
 // Prevents NoSQL Injection and XSS without breaking Date/Number objects
+// 5. DEEP SANITIZATION MIDDLEWARE
 app.use((req: Request, res: Response, next: NextFunction) => {
   const skipFields = ["email", "password", "profilePicture"];
 
   const sanitize = (obj: any): any => {
-    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    if (Array.isArray(obj)) return obj.map(item => sanitize(item));
+
+    if (obj && typeof obj === "object" && !(obj instanceof Date)) {
+      const sanitizedObj: any = {}; // Create new to avoid reference issues
       for (const key in obj) {
-        // Skip specific fields OR values that aren't strings (like Dates/Numbers)
-        if (skipFields.includes(key) || typeof obj[key] !== "string") {
+        if (skipFields.includes(key)) {
+          sanitizedObj[key] = obj[key];
           continue;
         }
 
-        let value = obj[key];
-        // 1. Anti-NoSQL Injection (removes $)
-        value = value.replace(/\$/g, ""); 
-        
-        // 2. Anti-XSS (removes < > tags) - Skip for emails
-        if (!value.includes("@")) {
-          value = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        // If it's a nested object (like placeInfo), go deeper
+        if (typeof obj[key] === "object" && obj[key] !== null) {
+          sanitizedObj[key] = sanitize(obj[key]);
+        } 
+        // If it's a string, clean it
+        else if (typeof obj[key] === "string") {
+          let value = obj[key];
+          value = value.replace(/\$/g, ""); // Anti-NoSQL
+          if (!value.includes("@")) {
+            value = value.replace(/</g, "&lt;").replace(/>/g, "&gt;"); // Anti-XSS
+          }
+          sanitizedObj[key] = value;
+        } else {
+          sanitizedObj[key] = obj[key];
         }
-        
-        obj[key] = value;
       }
+      return sanitizedObj;
     }
     return obj;
   };
 
-  if (req.body) req.body = sanitize(req.body);
+  if (req.body && Object.keys(req.body).length > 0) {
+    req.body = sanitize(req.body);
+  }
   next();
 });
-
 // 6. GLOBAL RATE LIMITER
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -84,6 +96,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/blogs', blog);
 app.use('/api/admin/blogs', adminBlogRouter);
+app.use('/api/picks', pickRoutes);
 // Health Check Route
 app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: "🚀 PeerPicks API is live" });

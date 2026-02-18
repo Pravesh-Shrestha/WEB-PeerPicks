@@ -47,10 +47,22 @@ export const pickService = {
   /**
    * Fetches the discovery feed with pagination.
    */
-  async getFeed(page: number = 1, limit: number = 10) {
+async getFeed(page: number, limit: number) {
     const skip = (page - 1) * limit;
-    return await pickRepository.getDiscoveryFeed(limit, skip);
-  },
+    
+    // We fetch the count and the data simultaneously for speed
+    const [picks, total] = await Promise.all([
+        pickRepository.findAll(limit, skip),
+        pickRepository.countAll()
+    ]);
+
+    return { 
+        picks, 
+        total,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit)
+    };
+},
 
   /**
    * Business logic for deletion.
@@ -87,4 +99,20 @@ export const pickService = {
     if (!pick) throw new Error("Pick not found.");
     return pick;
   },
+  async getPicksByUser(userId: string, page: number, limit: number) {
+        const skip = (page - 1) * limit;
+        
+        const [picks, total] = await Promise.all([
+            pickRepository.findByUser(userId, limit, skip),
+            pickRepository.countByUser(userId)
+        ]);
+
+        return {
+            picks,
+            total,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit)
+        };
+    },
+
 };

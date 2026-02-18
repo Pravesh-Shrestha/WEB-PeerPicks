@@ -7,9 +7,9 @@ export const pickRepository = {
   },
 
   async findById(id: string): Promise<IPick | null> {
-    return await Pick.findById(id)
-      .populate('user', 'fullName avatarUrl') // Join user data
-      .lean() as IPick | null;
+    return (await Pick.findById(id)
+      .populate("user", "fullName avatarUrl") // Join user data
+      .lean()) as IPick | null;
   },
 
   // STRICT DELETE: Ensures only the owner can delete their pick
@@ -24,22 +24,51 @@ export const pickRepository = {
       .sort({ createdAt: -1 }) // Pinterest-style: latest first
       .skip(skip)
       .limit(limit)
-      .populate('user', 'fullName avatarUrl')
+      .populate("user", "fullName avatarUrl")
       .lean();
   },
   // Add this to your existing pickRepository object
-  async update(pickId: string, userId: string, updateData: Partial<IPick>): Promise<IPick | null> {
-        // We filter by both _id and user to ensure only the owner can modify it
-        return await Pick.findOneAndUpdate(
-            { _id: pickId, user: userId },
-            { $set: updateData },
-            { new: true, runValidators: true }
-        ).lean() as IPick | null;
+  async update(
+    pickId: string,
+    userId: string,
+    updateData: Partial<IPick>,
+  ): Promise<IPick | null> {
+    // We filter by both _id and user to ensure only the owner can modify it
+    return (await Pick.findOneAndUpdate(
+      { _id: pickId, user: userId },
+      { $set: updateData },
+      { new: true, runValidators: true },
+    ).lean()) as IPick | null;
   },
 
   async findByIdRaw(id: string): Promise<IPick | null> {
-        return await Pick.findById(id)
-            .populate('user', 'fullName avatarUrl')
-            .lean() as IPick | null;
-}
+    return (await Pick.findById(id)
+      .populate("user", "fullName avatarUrl")
+      .lean()) as IPick | null;
+  },
+  async findByUser(userId: string, limit: number, skip: number) {
+    return await Pick.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("user", "username profilePicture fullName")
+      .lean();
+  },
+
+  async countByUser(userId: string) {
+    return await Pick.countDocuments({ user: userId });
+  },
+
+  async findAll(limit: number, skip: number) {
+    return await Pick.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("user", "username profilePicture")
+      .lean();
+  },
+
+  async countAll() {
+    return await Pick.countDocuments();
+  },
 };

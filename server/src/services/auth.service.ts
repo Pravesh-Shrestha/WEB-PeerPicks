@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import fs from 'fs';
 import { UserRepository } from '../repositories/user.repository';
 import { SignupDTO, LoginDTO, UpdateUserDTO } from '../dtos/auth.dto';
 import { JWT_SECRET } from '../config/index';
 import { HttpError } from '../errors/http-error';
 import { sendEmail } from '../config/email';
+import path from 'path';
 const CLIENT_URL = process.env.CLIENT_URL as string || 'http://localhost:3004';
 const userRepository = new UserRepository();
 
@@ -88,16 +90,29 @@ export class AuthService {
     if (!user) {
       throw new HttpError(404, "User not found");
     }
-    if (user.email !== data.email) {
-      const emailExists = await userRepository.findByEmail(data.email!);
+
+    // 1. Email uniqueness check
+    if (data.email && user.email !== data.email) {
+      const emailExists = await userRepository.findByEmail(data.email);
       if (emailExists) {
         throw new HttpError(409, "Email already exists");
       }
     }
+
+    // 2. Password hashing
     if (data.password) {
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-      data.password = hashedPassword;
+      data.password = await bcrypt.hash(data.password, 10);
     }
+
+    // 3. PHYSICAL FILE CLEANUP (New Logic)
+    // If a new profile picture is being uploaded, delete the old one
+    if (data.profilePicture && user.profilePicture) {
+      const oldPath = path.join(__dirname, "../../", user.profilePicture);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath); // Use "delete" logic for storage cleanup
+      }
+    }
+
     const updatedUser = await userRepository.updateUser(userId, data);
     return updatedUser;
   }
