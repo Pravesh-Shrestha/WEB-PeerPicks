@@ -43,30 +43,42 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 // 5. ROBUST SANITIZATION MIDDLEWARE
 // Prevents NoSQL Injection and XSS without breaking Date/Number objects
 // 5. DEEP SANITIZATION MIDDLEWARE
+// Inside your Deep Sanitization Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const skipFields = ["email", "password", "profilePicture"];
+  const skipFields = ["email", "password", "profilePicture", "images"];
 
   const sanitize = (obj: any): any => {
     if (Array.isArray(obj)) return obj.map(item => sanitize(item));
 
     if (obj && typeof obj === "object" && !(obj instanceof Date)) {
-      const sanitizedObj: any = {}; // Create new to avoid reference issues
+      const sanitizedObj: any = {};
       for (const key in obj) {
         if (skipFields.includes(key)) {
           sanitizedObj[key] = obj[key];
           continue;
         }
 
-        // If it's a nested object (like placeInfo), go deeper
+        // --- NEW LOGIC FOR PICK DATA ---
+        // If the value is a string that looks like JSON (placeInfo/reviewInfo)
+        if (typeof obj[key] === "string" && (obj[key].startsWith('{') || obj[key].startsWith('['))) {
+            try {
+                const parsed = JSON.parse(obj[key]);
+                sanitizedObj[key] = JSON.stringify(sanitize(parsed)); // Sanitize the object then re-string
+                continue;
+            } catch (e) {
+                // Not actually JSON, continue to normal string sanitization
+            }
+        }
+
         if (typeof obj[key] === "object" && obj[key] !== null) {
           sanitizedObj[key] = sanitize(obj[key]);
         } 
-        // If it's a string, clean it
         else if (typeof obj[key] === "string") {
           let value = obj[key];
           value = value.replace(/\$/g, ""); // Anti-NoSQL
-          if (!value.includes("@")) {
-            value = value.replace(/</g, "&lt;").replace(/>/g, "&gt;"); // Anti-XSS
+          // Allow URLs/Links (don't escape < > in links/images)
+          if (!value.includes("@") && !value.startsWith("http")) {
+            value = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
           }
           sanitizedObj[key] = value;
         } else {

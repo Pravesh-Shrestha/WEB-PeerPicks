@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
 import { signupDTO, loginDTO, updateUserDTO } from "../dtos/auth.dto";
+import { HttpError } from "../errors/http-error";
 
 const authService = new AuthService();
 
@@ -9,14 +10,18 @@ export class AuthController {
     try {
       const validatedData = signupDTO.parse(req.body);
       const user = await authService.register(validatedData);
-      res.status(201).json({ message: "Registration successful", user });
+      
+      res.status(201).json({ 
+        success: true, 
+        message: "Registration successful", 
+        user 
+      });
     } catch (error: any) {
-      // ADD THIS LOG TO SEE ERRORS IN YOUR TERMINAL
-      console.error("Validation Error Details:", error.errors);
-
+      // Zod errors contain an 'issues' or 'errors' array
+      const message = error.errors ? error.errors[0].message : error.message;
       res.status(400).json({
         success: false,
-        error: error.errors || error.message,
+        message: message || "Validation failed",
       });
     }
   }
@@ -25,54 +30,60 @@ export class AuthController {
     try {
       const validatedData = loginDTO.parse(req.body);
       const result = await authService.login(validatedData);
-      res.status(200).json(result);
+      
+      // result usually contains { user, token }
+      res.status(200).json({
+        success: true,
+        ...result
+      });
     } catch (error: any) {
-      console.error("Validation Error Details:", error.errors);
-      console.log("Login Error:", error.errors);
-      res.status(401).json({ error: error.message || "Login failed" });
+      res.status(401).json({ 
+        success: false, 
+        message: error.message || "Login failed. Please check your credentials." 
+      });
     }
   }
 
   async getUserProfile(req: Request, res: Response) {
     try {
-      const userId = req.user?._id;
+      // Unified userId extraction to match authorizedMiddleware
+      const userId = req.user?._id || req.user?.id;
+      
       if (!userId) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
+        throw new HttpError(401, "Unauthorized: No user session found");
       }
+
       const user = await authService.getUserById(userId);
-      return res
-        .status(200)
-        .json({
-          success: true,
-          data: user,
-          message: "User profile fetched successfully",
-        });
-    } catch (error: Error | any) {
-      return res
-        .status(error.statusCode || 500)
-        .json({
-          success: false,
-          message: error.message || "Internal Server Error",
-        });
+      return res.status(200).json({
+        success: true,
+        data: user,
+        message: "User profile fetched successfully",
+      });
+    } catch (error: any) {
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Internal Server Error",
+      });
     }
   }
 
   async updateUserProfile(req: Request, res: Response) {
     try {
-      // Ensure userId matches your middleware (some use .id, some use ._id)
       const userId = req.user?._id || req.user?.id; 
       
       if (!userId) {
-        return res.status(401).json({ success: false, message: "Unauthorized" });
+        throw new HttpError(401, "Unauthorized");
       }
 
       const parsedData = updateUserDTO.safeParse(req.body);
       if (!parsedData.success) {
-        return res.status(400).json({ success: false, errors: parsedData.error.errors });
+        return res.status(400).json({ 
+            success: false, 
+            message: parsedData.error.errors[0].message 
+        });
       }
 
+      // If middleware processed a profile picture
       if (req.file) {
         parsedData.data.profilePicture = `/uploads/${req.file.filename}`;
       }
@@ -81,7 +92,7 @@ export class AuthController {
 
       return res.status(200).json({
         success: true,
-        user: updatedUser, // Changed from 'data' to 'user' to match frontend result.user
+        user: updatedUser,
         message: "User profile updated successfully",
       });
     } catch (error: any) {
@@ -93,39 +104,43 @@ export class AuthController {
   }
 
   async sendResetPasswordEmail(req: Request, res: Response) {
-      try {
-          const { email } = req.body;
-          // We don't wait for the actual email to send before responding to prevent timing attacks,
-          // but for now, we'll keep the await for simplicity.
-          await authService.sendResetPasswordEmail(email);
-          
-          return res.status(200).json({ 
-              success: true,
-              message: "If an account exists with this email, a reset link has been sent." 
-          });
-      } catch (error: any) {
-          // Log the error internally, but don't leak DB details to the user
-          console.error("Reset Email Error:", error);
-          return res.status(error.statusCode ?? 500).json({ 
-              success: false, 
-              message: "An error occurred while processing your request." 
-          });
-      }
+    try {
+      const { email } = req.body;
+      if (!email) throw new HttpError(400, "Email is required");
+
+      await authService.sendResetPasswordEmail(email);
+      
+      return res.status(200).json({ 
+        success: true,
+        message: "If an account exists with this email, a reset link has been sent." 
+      });
+    } catch (error: any) {
+      console.error("Reset Email Error:", error);
+      // We return 200 even on error to prevent email enumeration attacks
+      return res.status(200).json({ 
+        success: true, 
+        message: "If an account exists with this email, a reset link has been sent." 
+      });
+    }
   }
 
-    async resetPassword(req: Request, res: Response) {
-        try {
+  async resetPassword(req: Request, res: Response) {
+    try {
+      const token = req.params.token;
+      const { newPassword } = req.body;
+      
+      if (!newPassword) throw new HttpError(400, "New password is required");
 
-           const token = req.params.token;
-            const { newPassword } = req.body;
-            await authService.resetPassword(token, newPassword);
-            return res.status(200).json(
-                { success: true, message: "Password has been reset successfully." }
-            );
-        } catch (error: Error | any) {
-            return res.status(error.statusCode ?? 500).json(
-                { success: false, message: error.message || "Internal Server Error" }
-            );
-        }
+      await authService.resetPassword(token, newPassword);
+      return res.status(200).json({ 
+        success: true, 
+        message: "Password has been reset successfully." 
+      });
+    } catch (error: any) {
+      return res.status(error.statusCode || 500).json({ 
+        success: false, 
+        message: error.message || "Internal Server Error" 
+      });
     }
+  }
 }

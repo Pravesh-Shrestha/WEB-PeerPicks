@@ -1,13 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPlace extends Document {
-  placeId: string;    // External ID (e.g., from Google Places API)
-  name: string;
+  placeId: string;    // This will now store the Google Maps Link
+  name: string;       // This will store the "Alias" (e.g., "Epsu Ko Ghar")
   category: string;
-  address: string;
-  location: {
+  address: string;    // The raw Link again (for easy retrieval)
+  location?: {
     type: "Point";
-    coordinates: [number, number]; // [Longitude, Latitude]
+    coordinates: [number, number];
   };
 }
 
@@ -18,11 +18,8 @@ const PlaceSchema = new Schema<IPlace>({
   address: { type: String },
   location: {
     type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], required: true } 
+    coordinates: { type: [Number], default: [0, 0] } 
   }
 });
-
-// This index allows us to search for places "near" the user's GPS
-PlaceSchema.index({ location: '2dsphere' });
 
 export default mongoose.model<IPlace>('Place', PlaceSchema);

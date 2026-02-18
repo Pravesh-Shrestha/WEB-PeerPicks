@@ -1,29 +1,19 @@
 import Place, { IPlace } from '../models/place.model';
 
 export const placeRepository = {
-  // Find a place by its external ID (e.g., Google Maps ID)
-  async findByPlaceId(placeId: string): Promise<IPlace | null> {
-    return await Place.findOne({ placeId });
-  },
-
-  // Create or Update place metadata
-  async upsertPlace(placeData: Partial<IPlace>): Promise<IPlace | null> {
-    return await Place.findOneAndUpdate(
-      { placeId: placeData.placeId },
+  /**
+   * UPSERT: Finds a place by its Google Link or creates it.
+   * This ensures one place can be reviewed by many users without duplication.
+   */
+  async upsertPlace(placeData: Partial<IPlace>): Promise<IPlace> {
+    return (await Place.findOneAndUpdate(
+      { placeId: placeData.placeId }, // The Google Maps URL
       { $set: placeData },
-      { upsert: true, new: true }
-    );
+      { upsert: true, new: true, runValidators: true }
+    )) as IPlace;
   },
 
-  // Geo-spatial search for the "Real-time Map" feature
-  async findNearby(lng: number, lat: number, radiusInMeters: number = 5000) {
-    return await Place.find({
-      location: {
-        $near: {
-          $geometry: { type: "Point", coordinates: [lng, lat] },
-          $maxDistance: radiusInMeters
-        }
-      }
-    });
+  async findByLinkId(linkId: string): Promise<IPlace | null> {
+    return await Place.findOne({ placeId: linkId });
   }
 };

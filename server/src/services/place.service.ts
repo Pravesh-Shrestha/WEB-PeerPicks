@@ -1,10 +1,20 @@
 import { placeRepository } from '../repositories/place.repository';
+import { pickRepository } from '../repositories/pick.repository';
 
 export const placeService = {
   /**
-   * Retrieves places based on the user's GPS view.
+   * GET HUB PROFILE: Returns the Place info + every user who reviewed it.
    */
-  async getLocalDiscovery(lng: number, lat: number, radius: number = 5000) {
-    return await placeRepository.findNearby(lng, lat, radius);
+  async getPlaceHubDetails(linkId: string) {
+    const place = await placeRepository.findByLinkId(linkId);
+    if (!place) throw new Error("Location hub not found.");
+
+    // Fetch all 'Picks' associated with this unique link
+    const communityPicks = await pickRepository.findByPlace(linkId);
+
+    return {
+      place,
+      communityPicks
+    };
   }
 };

@@ -2,19 +2,18 @@ import { socialRepository } from '../repositories/social.repository';
 
 export const socialService = {
   /**
-   * Handles the upvote toggle logic.
-   * Automatically increments/decrements the Pick's upvoteCount.
+   * TOGGLE SUPPORT: Handles the Upvote logic.
+   * If user already upvoted, it 'deletes' the upvote.
+   * If not, it 'creates' one.
    */
   async handleUpvote(userId: string, pickId: string) {
-    // This calls the repository toggle which handles the 'deleted' or 'created' state
+    // result returns { action: 'created' | 'deleted', status: boolean }
     const result = await socialRepository.toggleUpvote(userId, pickId);
-    
-    // Logic for sending notifications to the author can be added here
     return result;
   },
 
   /**
-   * Standalone logic for adding/removing comments.
+   * CONSENSUS TRACKING: Manages the count of reports/comments on a pick.
    */
   async syncCommentCount(pickId: string) {
     return await socialRepository.incrementCommentCount(pickId);
