@@ -26,5 +26,20 @@ export const pickRepository = {
       .limit(limit)
       .populate('user', 'fullName avatarUrl')
       .lean();
-  }
+  },
+  // Add this to your existing pickRepository object
+  async update(pickId: string, userId: string, updateData: Partial<IPick>): Promise<IPick | null> {
+        // We filter by both _id and user to ensure only the owner can modify it
+        return await Pick.findOneAndUpdate(
+            { _id: pickId, user: userId },
+            { $set: updateData },
+            { new: true, runValidators: true }
+        ).lean() as IPick | null;
+  },
+
+  async findByIdRaw(id: string): Promise<IPick | null> {
+        return await Pick.findById(id)
+            .populate('user', 'fullName avatarUrl')
+            .lean() as IPick | null;
+}
 };

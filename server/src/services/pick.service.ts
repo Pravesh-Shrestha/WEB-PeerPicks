@@ -1,7 +1,7 @@
-import { pickRepository } from '../repositories/pick.repository';
-import { placeRepository } from '../repositories/place.repository';
-import { socialRepository } from '../repositories/social.repository';
-import { Types } from 'mongoose';
+import { pickRepository } from "../repositories/pick.repository";
+import { placeRepository } from "../repositories/place.repository";
+import { socialRepository } from "../repositories/social.repository";
+import { Types } from "mongoose";
 
 export const pickService = {
   /**
@@ -19,8 +19,8 @@ export const pickService = {
       address: placeData.address,
       location: {
         type: "Point",
-        coordinates: [placeData.lng, placeData.lat]
-      }
+        coordinates: [placeData.lng, placeData.lat],
+      },
     });
 
     if (!place) throw new Error("Failed to synchronize place metadata.");
@@ -33,7 +33,7 @@ export const pickService = {
       stars: reviewData.stars,
       description: reviewData.description,
       mediaUrls: reviewData.mediaUrls,
-      tags: reviewData.tags
+      tags: reviewData.tags,
     });
 
     // If this is a review of someone else's review, increment their interaction count
@@ -60,5 +60,31 @@ export const pickService = {
     const deleted = await pickRepository.delete(pickId, userId);
     if (!deleted) throw new Error("Pick not found or unauthorized.");
     return deleted;
-  }
-}; 
+  },
+  // Add these to your pickService object
+  async updatePick(pickId: string, userId: string, updateData: any) {
+    // Logic: Only allow updating specific fields
+    const allowedUpdates = {
+      stars: updateData.stars,
+      description: updateData.description,
+      mediaUrls: updateData.mediaUrls,
+      tags: updateData.tags,
+    };
+
+    const updatedPick = await pickRepository.update(
+      pickId,
+      userId,
+      allowedUpdates,
+    );
+    if (!updatedPick)
+      throw new Error("Pick not found or unauthorized to edit.");
+
+    return updatedPick;
+  },
+
+  async getPickById(id: string) {
+    const pick = await pickRepository.findByIdRaw(id);
+    if (!pick) throw new Error("Pick not found.");
+    return pick;
+  },
+};
