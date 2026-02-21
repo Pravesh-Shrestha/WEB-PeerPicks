@@ -1,38 +1,33 @@
 "use client";
 
-import { DashboardProvider, useDashboard } from '../../context/DashboardContext';
+import React from 'react';
 import Sidebar from './components/sidebar';
-import ProfilePanel from './components/profile_panel';
-import { useAuth } from '@/app/context/AuthContext';
+import ProfilePanel from './components/shared/right-profile-card';
+import { DashboardProvider } from '@/app/context/DashboardContext';
 
-function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const { openModal } = useDashboard();
-  const { user } = useAuth();
-
-  return (
-    <div className="flex h-screen bg-[#0B0C10] text-white overflow-hidden font-sans">
-      <aside className="hidden md:block">
-        {/* Now the button works! */}
-        <Sidebar onOpenCreate={openModal} />
-      </aside>
-
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative">
-        <div className="min-h-full bg-gradient-to-b from-[#0B0C10] to-[#0F1116]">
-          {children}
-        </div>
-      </main>
-
-      <aside className="hidden xl:block">
-        <ProfilePanel user={user} />
-      </aside>
-    </div>
-  );
-}
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function UniversalDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      {/* Root Container: #020203 ensures no grayish bleeding at the edges */}
+      <div className="flex h-screen bg-[#020203] text-white overflow-hidden">
+        
+        {/* SIDEBAR: Bg matches root exactly */}
+        <aside className="w-64 hidden lg:block border-r border-white/[0.03] bg-[#020203]">
+          <Sidebar />
+        </aside>
+
+        {/* MAIN FEED: Scrollable area with the same background */}
+        <main className="flex-1 overflow-y-auto no-scrollbar relative bg-[#020203]">
+          <div className="max-w-[1600px] mx-auto w-full min-h-full px-4 md:px-8">
+            {children}
+          </div>
+        </main>
+
+        {/* RIGHT PANEL: Bg matches root exactly */}
+        <aside className="w-80 hidden xl:block border-l border-white/[0.03] bg-[#020203]">
+          <ProfilePanel />
+        </aside>
+      </div>
     </DashboardProvider>
   );
 }

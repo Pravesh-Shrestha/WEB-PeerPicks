@@ -22,26 +22,22 @@ declare global {
 export async function authorizedMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
         const authHeader = req.headers.authorization;
+        // Check header OR check cookies (requires cookie-parser on express)
+        const token = authHeader?.startsWith("Bearer ") 
+            ? authHeader.split(" ")[1] 
+            : req.cookies?.auth_token;
 
-        // 1. Check for presence of Bearer Token
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            throw new HttpError(401, "Authorization header missing or malformed");
+        if (!token) {
+            throw new HttpError(401, "No authorization token provided");
         }
 
-        const token = authHeader.split(" ")[1];
-        if (!token) throw new HttpError(401, "Token missing");
-
-        // 2. Verify Token
         const decoded = jwt.verify(token, JWT_SECRET) as Record<string, any>;
 
-        // 3. THE FIX: Match your JWT payload key. 
-        // If your login uses { _id: user._id }, then use decoded._id here.
-        const userId = decoded.id || decoded._id || decoded.sub; 
-
-        if (!userId) {
+        if (!decoded.id && !decoded._id && !decoded.sub) {
             throw new HttpError(401, "Invalid token payload: No user identifier found");
         }
 
+        const userId = decoded.id || decoded._id || decoded.sub;
         // 4. Validate user exists in DB
         const user = await userRepository.getUserById(userId);
         if (!user) {

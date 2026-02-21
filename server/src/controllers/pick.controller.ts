@@ -1,48 +1,59 @@
-import { Request, Response } from 'express';
-import { pickService } from '../services/pick.service';
-import { HttpError } from '../errors/http-error';
+import { Request, Response } from "express";
+import { pickService } from "../services/pick.service";
+import { HttpError } from "../errors/http-error";
+import { UserRepository } from "../repositories/user.repository";
+const userRepo = new UserRepository(); // Create an instance
 
 export const pickController = {
   /**
    * CREATE: Process new social post
-   * Parses 'placeInfo' and 'reviewInfo' JSON strings from FormData
    */
   async createPick(req: Request, res: Response) {
     try {
       const userId = (req.user as any)._id;
+      const placeData = JSON.parse(req.body.placeInfo);
+      const reviewData = JSON.parse(req.body.reviewInfo);
 
-      if (!req.body.placeInfo || !req.body.reviewInfo) {
-          throw new HttpError(400, "Incomplete post data.");
-      }
+      // EXTRACT COORDINATES FROM FRONTEND
+      // Expecting { lng: number, lat: number } in placeInfo
+      const location = {
+        type: "Point",
+        coordinates: [placeData.lng, placeData.lat],
+      };
 
-      const placeData = JSON.parse(req.body.placeInfo); // { link, alias, category }
-      const reviewData = JSON.parse(req.body.reviewInfo); // { stars, description, tags }
-
-      // Map files to URLs (Supports up to 5 photos/videos)
-      const files = req.files as Express.Multer.File[];
-      const mediaUrls = files ? files.map(file => `/uploads/picks/${file.filename}`) : [];
-
-      const newPick = await pickService.createNewPick(
-        userId, 
-        placeData, 
-        { ...reviewData, mediaUrls }
-      );
+      const newPick = await pickService.createNewPick(userId, placeData, {
+        ...reviewData,
+        location, // Pass location to the service
+        mediaUrls: (req.files as any[]).map(
+          (f) => `/uploads/picks/${f.filename}`,
+        ),
+      });
 
       res.status(201).json({ success: true, data: newPick });
     } catch (error: any) {
-      res.status(error.statusCode || 500).json({ success: false, message: error.message });
+      res
+        .status(error.statusCode || 500)
+        .json({ success: false, message: error.message });
     }
   },
 
   /**
    * READ: Discovery Feed (Instagram-style)
+   * Enhanced: Passes current userId to check 'isUpvoted' and 'isFollowing'
    */
   async getDiscoveryFeed(req: Request, res: Response) {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      
-      const feed = await pickService.getDiscoveryFeed(page, limit);
+
+      // Extract userId if available (optional for public feeds)
+      const currentUserId = (req.user as any)?._id;
+
+      const feed = await pickService.getDiscoveryFeed(
+        page,
+        limit,
+        currentUserId,
+      );
       res.status(200).json({ success: true, data: feed });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -55,12 +66,16 @@ export const pickController = {
   async getPick(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const pick = await pickService.getPickById(id);
+      const currentUserId = (req.user as any)?._id;
+
+      const pick = await pickService.getPickById(id, currentUserId);
       if (!pick) throw new HttpError(404, "Review not found.");
-      
+
       res.status(200).json({ success: true, data: pick });
     } catch (error: any) {
-      res.status(error.statusCode || 500).json({ success: false, message: error.message });
+      res
+        .status(error.statusCode || 500)
+        .json({ success: false, message: error.message });
     }
   },
 
@@ -70,20 +85,45 @@ export const pickController = {
   async getUserPicks(req: Request, res: Response) {
     try {
       const { userId } = req.params;
-      const picks = await pickService.getPicksByUser(userId);
-      res.status(200).json({ success: true, data: picks });
+      const currentUserId = (req.user as any)?._id;
+
+      // FIX: Use 'userRepo' instance instead of the Class name
+      const user = await userRepo.getUserById(userId);
+      if (!user) throw new HttpError(404, "User not found");
+
+      const picks = await pickService.getPicksByUser(userId, currentUserId);
+
+      // FIX: Use 'userRepo' instance here as well
+      const isFollowing = currentUserId
+        ? await userRepo.isFollowing(currentUserId, userId)
+        : false;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          profile: { ...user.toObject(), isFollowing },
+          picks: picks,
+        },
+      });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      res
+        .status(error.statusCode || 500)
+        .json({ success: false, message: error.message });
     }
   },
 
   /**
-   * READ: Place Hub Data (All reviews for one link)
+   * READ: Place Hub Data
    */
   async getPlaceProfile(req: Request, res: Response) {
     try {
       const { linkId } = req.params;
-      const data = await pickService.getPlaceHubDetails(decodeURIComponent(linkId));
+      const currentUserId = (req.user as any)?._id;
+
+      const data = await pickService.getPlaceHubDetails(
+        decodeURIComponent(linkId),
+        currentUserId,
+      );
       res.status(200).json({ success: true, data });
     } catch (error: any) {
       res.status(404).json({ success: false, message: error.message });
@@ -101,7 +141,9 @@ export const pickController = {
       const updated = await pickService.updateUserPick(id, userId, req.body);
       res.status(200).json({ success: true, data: updated });
     } catch (error: any) {
-      res.status(error.statusCode || 403).json({ success: false, message: error.message });
+      res
+        .status(error.statusCode || 403)
+        .json({ success: false, message: error.message });
     }
   },
 
@@ -116,9 +158,36 @@ export const pickController = {
       await pickService.deleteUserPick(id, userId);
       res.status(200).json({ success: true, message: "Review deleted." });
     } catch (error: any) {
-      res.status(error.statusCode || 403).json({ success: false, message: error.message });
+      res
+        .status(error.statusCode || 403)
+        .json({ success: false, message: error.message });
     }
   },
+  /**
+   * READ: Fetch hydrated discussion thread for a specific Pick.
+   * This retrieves all comments/replies linked to the parent post.
+   */
+  async getPickDiscussion(req: Request, res: Response) {
+    try {
+      const { id } = req.params; // The ID of the parent Pick
+
+      // Optional: Extract current user ID from middleware to hydrate 'hasUpvoted' status
+      const currentUserId = (req.user as any)?._id;
+
+      const discussion = await pickService.getDiscussion(id, currentUserId);
+
+      res.status(200).json({
+        success: true,
+        data: discussion,
+      });
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Failed to load discussion.",
+      });
+    }
+  },
+
   /**
    * READ: Category-based feed filtering
    */
@@ -127,14 +196,22 @@ export const pickController = {
       const { category } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const picks = await pickService.getPicksByCategory(category, page, limit);
+      const currentUserId = (req.user as any)?._id;
+
+      const picks = await pickService.getPicksByCategory(
+        category,
+        page,
+        limit,
+        currentUserId,
+      );
       res.status(200).json({ success: true, data: picks });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   },
+
   /**
-   * READ: Fetch all picks (for testing or admin purposes)
+   * READ: Fetch all picks (Admin/Testing)
    */
   async getAllPicks(req: Request, res: Response) {
     try {
@@ -143,6 +220,5 @@ export const pickController = {
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
-  }
-
+  },
 };

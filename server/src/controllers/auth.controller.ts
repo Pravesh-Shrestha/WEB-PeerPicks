@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
 import { signupDTO, loginDTO, updateUserDTO } from "../dtos/auth.dto";
 import { HttpError } from "../errors/http-error";
+import { pickService } from "../services/pick.service";
 
 const authService = new AuthService();
 
@@ -10,11 +11,11 @@ export class AuthController {
     try {
       const validatedData = signupDTO.parse(req.body);
       const user = await authService.register(validatedData);
-      
-      res.status(201).json({ 
-        success: true, 
-        message: "Registration successful", 
-        user 
+
+      res.status(201).json({
+        success: true,
+        message: "Registration successful",
+        user,
       });
     } catch (error: any) {
       // Zod errors contain an 'issues' or 'errors' array
@@ -30,56 +31,58 @@ export class AuthController {
     try {
       const validatedData = loginDTO.parse(req.body);
       const result = await authService.login(validatedData);
-      
+
       // result usually contains { user, token }
       res.status(200).json({
         success: true,
-        ...result
+        ...result,
       });
     } catch (error: any) {
-      res.status(401).json({ 
-        success: false, 
-        message: error.message || "Login failed. Please check your credentials." 
+      res.status(401).json({
+        success: false,
+        message:
+          error.message || "Login failed. Please check your credentials.",
       });
     }
   }
 
   async getUserProfile(req: Request, res: Response) {
     try {
-      // Unified userId extraction to match authorizedMiddleware
-      const userId = req.user?._id || req.user?.id;
-      
-      if (!userId) {
-        throw new HttpError(401, "Unauthorized: No user session found");
-      }
+      // If hitting /me, there is no :id param. Use the ID from the token middleware.
+      const id = req.params.id || (req as any).user?.id;
 
-      const user = await authService.getUserById(userId);
+      if (!id) throw new HttpError(401, "No Node ID provided");
+
+      const nodeActivity = await pickService.getPicksByUser(
+        id,
+        (req as any).user?.id,
+      );
+
       return res.status(200).json({
         success: true,
-        data: user,
-        message: "User profile fetched successfully",
+        data: nodeActivity, // This now contains profile + picks
       });
     } catch (error: any) {
       return res.status(error.statusCode || 500).json({
         success: false,
-        message: error.message || "Internal Server Error",
+        message: error.message || "Failed to sync with Node.",
       });
     }
   }
 
   async updateUserProfile(req: Request, res: Response) {
     try {
-      const userId = req.user?._id || req.user?.id; 
-      
+      const userId = req.user?._id || req.user?.id;
+
       if (!userId) {
         throw new HttpError(401, "Unauthorized");
       }
 
       const parsedData = updateUserDTO.safeParse(req.body);
       if (!parsedData.success) {
-        return res.status(400).json({ 
-            success: false, 
-            message: parsedData.error.errors[0].message 
+        return res.status(400).json({
+          success: false,
+          message: parsedData.error.errors[0].message,
         });
       }
 
@@ -109,17 +112,19 @@ export class AuthController {
       if (!email) throw new HttpError(400, "Email is required");
 
       await authService.sendResetPasswordEmail(email);
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         success: true,
-        message: "If an account exists with this email, a reset link has been sent." 
+        message:
+          "If an account exists with this email, a reset link has been sent.",
       });
     } catch (error: any) {
       console.error("Reset Email Error:", error);
       // We return 200 even on error to prevent email enumeration attacks
-      return res.status(200).json({ 
-        success: true, 
-        message: "If an account exists with this email, a reset link has been sent." 
+      return res.status(200).json({
+        success: true,
+        message:
+          "If an account exists with this email, a reset link has been sent.",
       });
     }
   }
@@ -128,18 +133,18 @@ export class AuthController {
     try {
       const token = req.params.token;
       const { newPassword } = req.body;
-      
+
       if (!newPassword) throw new HttpError(400, "New password is required");
 
       await authService.resetPassword(token, newPassword);
-      return res.status(200).json({ 
-        success: true, 
-        message: "Password has been reset successfully." 
+      return res.status(200).json({
+        success: true,
+        message: "Password has been reset successfully.",
       });
     } catch (error: any) {
-      return res.status(error.statusCode || 500).json({ 
-        success: false, 
-        message: error.message || "Internal Server Error" 
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Internal Server Error",
       });
     }
   }

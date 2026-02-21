@@ -1,177 +1,117 @@
 "use server";
 
-import { register, login, whoami, updateProfile,requestPasswordReset,resetPassword } from '../api/auth';
+import { register, login, whoami, updateProfile, requestPasswordReset, resetPassword } from '../api/auth';
 import { SignupData } from '../../app/(auth)/schema'; 
-import { setAuthToken, setUserData } from '../cookie';
+import { setAuthToken, setUserData, clearAuthCookies } from '../cookie';
 import { redirect } from 'next/navigation';
-import { clearAuthCookies } from "../cookie";
 import { revalidatePath } from 'next/cache';
+import { API } from '../api/endpoints';
+import axiosInstance from '../api/axios';
+
 /**
- * Handles the Registration Logic
+ * Shared error utility for Server Actions
  */
-export const handleRegister = async (data: SignupData) => {
-  try {
-    const result = await register(data);
-
-    /**
-     * Backend signup returns: { message: "Registration successful", user: {...} }
-     * (no `success` boolean). Normalize it for the UI.
-     */
-    const createdUser = result?.user ?? result?.data ?? null;
-    const isCreated = Boolean(createdUser) || Boolean(result?.id);
-
-    if (isCreated) {
-      return {
-        success: true,
-        message: result?.message || "Registration successful",
-        data: createdUser ?? result,
-      };
-    }
-
-    return {
-      success: false,
-      message: result?.message || "Registration failed",
-    };
-
-  } catch (error: any) {
-    console.error("Registration Server Error:", error);
+const serverActionError = (error: any, context: string) => {
+    console.error(`${context} Error:`, error.message || error);
     return { 
-      success: false, 
-      message: error.message || 'An unexpected error occurred' 
+        success: false, 
+        message: error.message || 'An unexpected error occurred' 
     };
-  }
 };
 
-/**
- * Handles the Login Logic
- * Updated to handle the 'token' and 'user' response seen in logs
- */
+export const handleRegister = async (data: SignupData) => {
+    try {
+        const result = await register(data);
+        const createdUser = result?.user ?? result?.data ?? null;
+
+        if (createdUser || result?.id) {
+            return {
+                success: true,
+                message: result?.message || "Registration successful",
+                data: createdUser ?? result,
+            };
+        }
+        return { success: false, message: result?.message || "Registration failed" };
+    } catch (error) {
+        return serverActionError(error, "Registration");
+    }
+};
+
 export const handleLogin = async (data: { email: string; password: string }) => {
-  console.log("--- Login Attempt Started ---");
-  console.log("Login Payload:", { email: data.email, password: "[HIDDEN]" });
-
   try {
-// auth-action.ts
-const result = await login(data);
+    await clearAuthCookies();
+    const result = await login(data);
 
-// FIX: Check for token since your backend doesn't send a 'success' boolean
-if (result && result.token) { 
-  await setAuthToken(result.token);
-  const userData = result.user;
-  await setUserData(userData);
-  return { success: true, message: 'Login successful', data: userData };
-}
+    // If the backend returns the token directly without a 'success' boolean,
+    // we verify the presence of the token/user.
+    const token = result?.token;
+    const userData = result?.user || result?.data;
 
-    // Handle case where API responds but credentials might be wrong
-    console.warn("Login Failed - No token provided in response");
-    return {
-      success: false,
-      message: result?.message || 'Invalid email or password'
+    if (token && userData) {
+      await setAuthToken(token);
+      await setUserData(userData);
+
+      return { success: true, data: userData };
+    }
+
+    return { 
+      success: false, 
+      message: result?.message || "Invalid Signal Credentials" 
     };
-
   } catch (error: any) {
-    console.error("--- Login Server Error ---");
-    console.error("Error Details:", error.message);
-    
-    return {
-      success: false,
-      message: error.message || 'An unexpected error occurred'
-    };
-  } finally {
-    console.log("--- Login Process Finished ---");
+    return serverActionError(error, "Login");
   }
 };
 
 export const handleLogout = async () => {
-  try {
-    // 1. Clear auth cookies (Deletes auth_token and user_data)
-    await clearAuthCookies();
-    
-    // Log for server-side debugging
-    console.log("User logged out successfully.");
-  } catch (error) {
-    console.error("Logout Error:", error);
-    // Even if cookie deletion fails, we typically still want to redirect
-  }
-
-  // 2. Redirect to login page 
-  // (Must be called outside the try-catch block for Next.js internal reasons)
-  redirect("/login");
+    try {
+        await clearAuthCookies();
+    } catch (error) {
+        console.error("Logout Cookie Error:", error);
+    }
+    redirect("/login");
 };
 
+/**
+ * Used for fetching the logged-in user's state to compare 
+ * against profile owners for the "Edit/Delete" visibility.
+ */
 export const handleWhoAmI = async () => {
-  try {
-    const response = await whoami();
-    return response;
-  } catch (error: any) {
-    console.error("WhoAmI Server Error:", error);
-    return { 
-      success: false, 
-      message: error.message || 'An unexpected error occurred' 
-    };
-  }
+    try {
+        const response = await axiosInstance.get(API.AUTH.WHOAMI);
+        return { success: true, data: response.data };
+    } catch (error: any) {
+        // Log the exact URL being hit to help debugging
+        console.error(`WhoAmI 404 at: ${error.config?.url}`); 
+        return { success: false, message: "Endpoint not found" };
+    }
 };
-
 
 export const handleUpdateProfile = async (formData: any) => {
-    try{
-        const result = await updateProfile(formData);
-        if(result.success){
-            // update cookie data
-            await setUserData(result.data);
-            // optionally revalidate path(s)
-            revalidatePath("/user/profile");
-            return {
-                success: true,
-                message: "Profile updated successfully",
-                data: result.data 
-            };
-        }
-        return {
-            success: false, message: result.message || "Failed to update profile"
-        }
-    }catch(err: Error | any){
-        return { success: false, message: err.message || "Failed to update profile"};
-    }
-}
-
-export const handleRequestPasswordReset = async (email: string) => {
     try {
-        const response = await requestPasswordReset(email);
-        if (response.success) {
-            return {
-                success: true,
-                message: 'Password reset email sent successfully'
-            }
+        const result = await updateProfile(formData);
+        if (result.success) {
+            await setUserData(result.data);
+            // Revalidate the profile path so the new image/name shows up immediately
+            revalidatePath("/profile/[id]", "page"); 
+            return { success: true, message: "Profile updated successfully", data: result.data };
         }
-        return { success: false, message: response.message || 'Request password reset failed' }
-    } catch (error: Error | any) {
-        return { success: false, message: error.message || 'Request password reset action failed' }
+        return { success: false, message: result.message || "Update failed" };
+    } catch (error) {
+        return serverActionError(error, "UpdateProfile");
     }
 };
 
 export const handleResetPassword = async (token: string, newPassword: string) => {
     try {
-        // FIX: Remove "token=" prefix and decode the URL string
         const cleanToken = decodeURIComponent(token).replace(/^token=/, '');
-        
         const response = await resetPassword(cleanToken, newPassword);
         
-        if (response.success) {
-            return {
-                success: true,
-                message: 'Password has been reset successfully'
-            }
-        }
-        
-        return { 
-            success: false, 
-            message: response.message || 'Reset password failed' 
-        }
-    } catch (error: any) {
-        return { 
-            success: false, 
-            message: error.message || 'Reset password action failed' 
-        }
+        return response.success 
+            ? { success: true, message: 'Password has been reset successfully' }
+            : { success: false, message: response.message || 'Reset password failed' };
+    } catch (error) {
+        return serverActionError(error, "ResetPassword");
     }
 };
+

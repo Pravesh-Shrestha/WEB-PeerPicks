@@ -1,40 +1,86 @@
 import { pickRepository } from "../repositories/pick.repository";
 import { placeRepository } from "../repositories/place.repository";
 import { socialRepository } from "../repositories/social.repository";
+import { UserRepository } from "../repositories/user.repository"; // Added to check follow status
 import { HttpError } from "../errors/http-error";
 import { Types } from "mongoose";
 
+const userRepo = new UserRepository();
+
+// pick.service.ts
+
+const hydratePicks = async (picks: any | any[], currentUserId?: string) => {
+  const isArray = Array.isArray(picks);
+  const picksList = isArray ? picks : [picks];
+
+  const currentUser = currentUserId ? await userRepo.getUserById(currentUserId) : null;
+
+  const hydrated = await Promise.all(picksList.map(async (pick) => {
+    const pickObj = pick.toObject ? pick.toObject() : pick;
+
+    // --- IDENTITY RESOLUTION ---
+    let userData = pickObj.user;
+    // If user is just an ID, fetch the full node so the name appears
+    if (typeof userData === 'string' || userData instanceof Types.ObjectId) {
+      userData = await userRepo.getUserById(userData.toString());
+    }
+
+    const hasUpvoted = currentUserId
+      ? pickObj.upvotes?.some((id: any) => id.toString() === currentUserId)
+      : false;
+
+    return {
+      ...pickObj,
+      user: userData, // Name and Profile Picture are now guaranteed
+      hasUpvoted,
+      // Metadata mapping
+      locationName: pickObj.placeDetails?.name || "Unknown Sector",
+      stars: pickObj.stars || 0
+    };
+  }));
+
+  return isArray ? hydrated : hydrated[0];
+};
 export const pickService = {
   /**
-   * CREATE: Synchronizes the Place Hub and saves the User Review.
+   * CREATE: Synchronizes the Place Hub and saves the User Review or Comment.
    */
   async createNewPick(userId: string, placeData: any, reviewData: any) {
-    // 1. Sync the Place Hub using the Google Link as the unique placeId.
-    // This allows many users to review the same link without duplicating data.
+    // 1. Sync the Place Hub
     const place = await placeRepository.upsertPlace({
-      placeId: placeData.link,      // The raw Google Maps URL
-      name: placeData.alias,        // The User's Alias (e.g., "Favorite Chill Spot")
+      placeId: placeData.name, // Ensure this matches your link/id logic
+      name: placeData.name,
       category: placeData.category,
-      address: placeData.link,      // Used for redirection
-      location: { type: "Point", coordinates: [0, 0] } // Map disabled
+      address: placeData.name,
+      // FIX: Pass actual coordinates to the place hub too
+      location: {
+        type: "Point",
+        coordinates: [placeData.lng, placeData.lat],
+      },
     });
 
     if (!place) throw new HttpError(500, "Failed to synchronize location hub.");
 
-    // 2. Create the Social Post (Pick)
+    // 2. Create the Pick with the REQUIRED location field
     const pick = await pickRepository.create({
       user: new Types.ObjectId(userId),
-      place: place.placeId,   
-      alias: placeData.alias,        // The User's Alias (e.g., "Favorite Chill Spot")
-      parentPick: reviewData.parentPickId || null,
+      place: place._id, // Matches 'place' required path in error
+      alias: placeData.alias,
+      parentPick: reviewData.parentPickId
+        ? new Types.ObjectId(reviewData.parentPickId)
+        : undefined,
       category: reviewData.category || null,
-      stars: reviewData.stars,
+      stars: reviewData.stars || 0,
       description: reviewData.description,
-      mediaUrls: reviewData.mediaUrls, // Handled by updated upload middleware
-      tags: reviewData.tags || []
+      mediaUrls: reviewData.mediaUrls || [],
+      tags: reviewData.tags || [],
+      // FIX: This solves the "location.coordinates is required" error
+      location: {
+        type: "Point",
+        coordinates: [placeData.lng, placeData.lat],
+      },
     });
 
-    // 3. If this is a response (Consensus), increment the parent's commentCount
     if (reviewData.parentPickId) {
       await socialRepository.incrementCommentCount(reviewData.parentPickId);
     }
@@ -43,74 +89,131 @@ export const pickService = {
   },
 
   /**
-   * READ: Fetches the main Discovery Feed
+   * READ: Fetches the discussion thread (replies) for a specific Pick.
    */
-  async getDiscoveryFeed(page: number, limit: number) {
+
+  async getDiscussion(pickId: string, currentUserId?: string) {
+    // 1. Fetch the Parent Transmission to verify it exists
+    const parent = await pickRepository.findById(pickId);
+    if (!parent)
+      throw new HttpError(404, "Target transmission node not found.");
+
+    // 2. Fetch all children (comments) associated with this parent
+    // We sort by 'upvoteCount' to prioritize the strongest "Consensus Signals"
+    const comments = await pickRepository.findByParent(pickId);
+
+    // 3. Hydrate the entire thread
+    // This attaches 'hasUpvoted' and author node details to every comment
+    const hydratedComments = await hydratePicks(comments, currentUserId);
+
+    return {
+      parent: (await hydratePicks([parent], currentUserId))[0],
+      signals: hydratedComments, // Using 'signals' instead of 'comments' for originality
+      count: parent.commentCount,
+    };
+  },
+
+  /**
+   * READ: Discovery Feed with interaction status
+   */
+  async getDiscoveryFeed(page: number, limit: number, currentUserId?: string) {
     const skip = (page - 1) * limit;
-    return await pickRepository.getDiscoveryFeed(limit, skip);
+    const picks = await pickRepository.getDiscoveryFeed(limit, skip);
+    return await hydratePicks(picks, currentUserId);
   },
 
   /**
    * READ: Single Pick detail view
    */
-  async getPickById(id: string) {
+  async getPickById(id: string, currentUserId?: string) {
     const pick = await pickRepository.findById(id);
     if (!pick) throw new HttpError(404, "Review not found.");
-    return pick;
-  },
-
-  /**
-   * READ: User's personal profile feed
-   */
-  async getPicksByUser(userId: string) {
-    return await pickRepository.findByUser(userId);
+    return await hydratePicks(pick, currentUserId);
   },
 
   /**
    * READ: Place Hub profile (Meta-data + all user reviews for this link)
    */
-  async getPlaceHubDetails(linkId: string) {
+  async getPlaceHubDetails(linkId: string, currentUserId?: string) {
     const place = await placeRepository.findByLinkId(linkId);
-    if (!place) throw new HttpError(404, "Location link not found in our database.");
+    if (!place) throw new HttpError(404, "Location link not found.");
 
-    // Finds all Picks associated with this specific Google Link
     const communityPicks = await pickRepository.findByPlace(linkId);
+    const hydratedPicks = await hydratePicks(communityPicks, currentUserId);
 
     return {
       place,
-      communityPicks
+      communityPicks: hydratedPicks,
     };
   },
 
   /**
    * UPDATE: Modify review text, stars, or tags
-   * STRICT: Repository level check ensures user: userId matches
    */
   async updateUserPick(pickId: string, userId: string, updateData: any) {
     const updatedPick = await pickRepository.update(pickId, userId, updateData);
     if (!updatedPick) {
-      throw new HttpError(403, "Update failed. You may not be the owner of this review.");
+      throw new HttpError(403, "Update failed. Unauthorized.");
     }
     return updatedPick;
   },
 
   /**
-   * DELETE: Strictly owner-only removal of a review
+   * DELETE: owner-only removal, syncing commentCount if it's a comment.
    */
   async deleteUserPick(pickId: string, userId: string) {
+    const pick = await pickRepository.findById(pickId);
+    if (!pick) throw new HttpError(404, "Pick not found.");
+
+    // Decrement parent's count if deleting a comment
+    if (pick.parentPick) {
+      await socialRepository.decrementCommentCount(pick.parentPick.toString());
+    }
+
     const deleted = await pickRepository.delete(pickId, userId);
     if (!deleted) {
-      throw new HttpError(403, "Delete failed. Unauthorized or review does not exist.");
+      throw new HttpError(403, "Delete failed. Unauthorized.");
     }
     return true;
   },
 
-  async getPicksByCategory(category: string, page: number, limit: number) {
+  async getPicksByCategory(
+    category: string,
+    page: number,
+    limit: number,
+    currentUserId?: string,
+  ) {
     const skip = (page - 1) * limit;
-    return await pickRepository.findByCategory(category, limit, skip);
+    const picks = await pickRepository.findByCategory(category, limit, skip);
+    return await hydratePicks(picks, currentUserId);
   },
 
   async getAllPicks() {
     return await pickRepository.findAllPicks();
-  }
+  },
+  async getPicksByUser(userId: string, currentUserId?: string) {
+    // 1. Fetch User Metadata from the repository
+    const user = await userRepo.getUserById(userId);
+    if (!user) throw new HttpError(404, "User node not found.");
+
+    // 2. Fetch the actual picks (posts)
+    const picks = await pickRepository.findByUser(userId);
+    const hydratedPicks = await hydratePicks(picks, currentUserId);
+
+    // 3. Determine if the current viewer is following this specific profile
+    const isFollowing = currentUserId
+      ? await userRepo.isFollowing(currentUserId, userId)
+      : false;
+
+    // 4. Return unified structure to satisfy the frontend state
+    return {
+      profile: {
+        ...user.toObject(),
+        isFollowing,
+        followerCount: user.followerCount || 0,
+        followingCount: user.followingCount || 0,
+      },
+      picks: hydratedPicks,
+    };
+  },
 };

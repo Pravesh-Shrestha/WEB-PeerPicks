@@ -1,172 +1,384 @@
 "use client";
 
-import React, { useState } from 'react';
-import { 
-  ArrowBigUp, 
-  ArrowBigDown, 
-  MessageSquare, 
-  Star, 
-  MoreHorizontal, 
-  Trash2,
+import React, { useEffect, useState, useTransition } from "react";
+import {
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+  Star,
+  Share2,
   MapPin,
-  ExternalLink,
-  X
-} from 'lucide-react';
-import MediaSlider from './media-slider';
-import { deletePick } from "@/lib/actions/pick-actions";
+  Maximize2,
+  X,
+  Heart,
+  Trash2,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { getMediaUrl } from "@/lib/utils";
+import {
+  handleVote,
+  handleDeletePick,
+  handleToggleSave,
+} from "@/lib/actions/pick-action";
+import { useAuth } from "@/app/context/AuthContext";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner"; // Added Sonner
 
-export function PickCard({ pick, onUpdate }: any) {
-  const [vote, setVote] = useState<'up' | 'down' | null>(null);
-  const [showOptions, setShowOptions] = useState(false);
+interface PickCardProps {
+  pick: any;
+  currentUserId?: string;
+  onDeleteSuccess?: () => void;
+  onSaveSuccess?: () => void;
+  initialIsFavorited?: boolean;
+}
+
+export const PickCard = ({
+  pick,
+  initialIsFavorited,
+  onDeleteSuccess,
+  onSaveSuccess, // Destructured correctly
+}: PickCardProps) => {
+  const { user: currentUser } = useAuth();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [voteStatus, setVoteStatus] = useState<"up" | null>(
+    pick.hasUpvoted ? "up" : null,
+  );
+  const [voteCount, setVoteCount] = useState(pick.upvoteCount || 0);
+  const [isFavorited, setIsFavorited] = useState(initialIsFavorited || false);
+
+  useEffect(() => {
+    if (!isPending) {
+      setIsFavorited(initialIsFavorited || false);
+    }
+  }, [initialIsFavorited, isPending]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
-  const user = pick.user || {};
-  const score = (pick.upvotes?.length || 0) - (pick.downvotes?.length || 0) + (vote === 'up' ? 1 : vote === 'down' ? -1 : 0);
-  
-  const resolve = (path: string) => {
-    if (!path) return null;
-    return path.startsWith('http') ? path : `http://localhost:3000${path.startsWith('/') ? path : `/${path}`}`;
+
+  const isAuthor =
+    currentUser?.id === pick.user?._id || currentUser?._id === pick.user?._id;
+  const authorName = pick.user?.fullName || pick.user?.name || "Anonymous User";
+  const authorAvatar = getMediaUrl(pick.user?.profilePicture, "profilePicture");
+  const mediaFiles = pick.mediaUrls || [];
+  const locationDisplay = pick.locationName || pick.placeDetails?.name || "Unknown Sector";
+  const aliasDisplay = pick.locationAlias || pick.alias || "";
+
+  const nextMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev + 1) % mediaFiles.length);
   };
 
-  const handleRedirect = () => {
-    const targetUrl = pick.placeInfo?.link || pick.place;
-    if (targetUrl) {
-      window.open(targetUrl, "_blank", "noopener,noreferrer");
+  const prevMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(
+      (prev) => (prev - 1 + mediaFiles.length) % mediaFiles.length,
+    );
+  };
+
+  const onVoteClick = async () => {
+    setVoteStatus(voteStatus === "up" ? null : "up");
+    setVoteCount((prev: number) => (voteStatus === "up" ? prev - 1 : prev + 1));
+    await handleVote(pick._id);
+  };
+
+  const onFavoriteClick = async () => {
+    if (isPending) return;
+
+    startTransition(async () => {
+      try {
+        const result = await handleToggleSave(pick._id);
+
+        if (result && result.success) {
+          if (result.isFavorited) {
+            setIsFavorited(true);
+
+            // Trigger global notification in FeedContent
+            if (onSaveSuccess) onSaveSuccess();
+
+            // Wait 1.4s for the top notification to be read before removing card
+            setTimeout(() => {
+              if (onDeleteSuccess) onDeleteSuccess();
+            }, 1400);
+          } else {
+            setIsFavorited(false);
+            // Instant removal if unsaving
+            if (onDeleteSuccess) onDeleteSuccess();
+          }
+        }
+      } catch (error: any) {
+        console.error("Favorite error:", error);
+        if (error.response?.status === 429) {
+          toast.error("SYSTEM BUSY", { description: "TOO MANY REQUESTS" });
+        }
+      }
+    });
+  };
+
+  // 2. DELETE LOGIC
+  const onDeleteClick = async () => {
+    // Protocol Compliance: Terminology "Delete" [cite: 2026-02-01]
+    const confirmed = confirm(
+      "CONFIRM PROTOCOL: Delete this pick from the system?",
+    );
+
+    if (confirmed) {
+      try {
+        const result = await handleDeletePick(pick._id);
+
+        if (result.success) {
+          toast.success("PICK DELETED", {
+            description: "DATA REMOVED FROM GLOBAL FEED",
+          });
+
+          // Remove from local feed state immediately
+          if (onDeleteSuccess) onDeleteSuccess();
+
+          router.refresh();
+        }
+      } catch (error: any) {
+        toast.error("DELETE FAILED", {
+          description: error.message || "INTERNAL SYSTEM ERROR",
+        });
+      }
     }
   };
-
-  const handleDelete = async () => {
-    if (confirm("Are you sure you want to delete this pick?")) {
-      await deletePick(pick._id);
-      if (onUpdate) onUpdate();
+  const renderMedia = (url: string, className: string, autoPlay = true) => {
+    const isVideo = url.match(/\.(mp4|webm|mov)$/i);
+    const fullUrl = getMediaUrl(url, "pick");
+    if (isVideo) {
+      return (
+        <video
+          src={fullUrl}
+          autoPlay={autoPlay}
+          muted={isMuted}
+          loop
+          playsInline
+          className={className}
+        />
+      );
     }
+    return <img src={fullUrl} className={className} alt="Post media" />;
   };
+  // 1. SHARE LOGIC
+  const onShareClick = () => {
+    // Generate URL based on pick ID
+    const url = `${window.location.origin}/picks/${pick._id}`;
 
-  const avatarSrc = resolve(user?.profilePicture);
-  const stars = pick.reviewInfo?.stars || 5;
+    // Copy to clipboard
+    navigator.clipboard.writeText(url);
+
+    // Design Protocol Toast
+    toast.info("LINK COPIED", {
+      description: "SIGNAL URL SAVED TO CLIPBOARD",
+      icon: <Share2 size={14} className="text-[#D4FF33]" />,
+    });
+  };
 
   return (
     <>
-      <div
-        className="pick-card group relative w-full max-w-[850px] mx-auto mb-6 transition-transform duration-500"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
-      >
-        {/* Ambient glow */}
-        <div className="absolute -inset-px rounded-[40px] bg-gradient-to-br from-[#D4FF33]/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl pointer-events-none" />
-
-        <div className="relative bg-[#0C0C0E] border border-white/[0.07] rounded-[40px] overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.8)]">
-          
+      <div className="relative w-full max-w-4xl mx-auto mb-20 group/card">
+        <div className="w-full bg-[#09090B] border border-white/5 rounded-[3.5rem] overflow-hidden shadow-2xl transition-all duration-500 hover:border-[#D4FF33]/20">
           {/* HEADER */}
-          <div className="relative px-8 py-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative shrink-0">
-                {avatarSrc ? (
-                  <img src={avatarSrc} className="w-12 h-12 rounded-2xl object-cover ring-2 ring-white/5" alt="" />
-                ) : (
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-lg font-black text-[#D4FF33]">
-                    {user?.fullName?.charAt(0) || 'U'}
-                  </div>
-                )}
+          <div className="p-10 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 rounded-full border border-white/10 overflow-hidden bg-zinc-900">
+                <img
+                  src={authorAvatar}
+                  className="w-full h-full object-cover"
+                  alt=""
+                />
               </div>
-
               <div>
-                <p className="text-[15px] font-bold text-white tracking-tight leading-none">
-                  {user?.fullName || 'User'}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <MapPin size={10} className="text-[#D4FF33]" />
-                  <span className="text-[10px] text-[#D4FF33] font-black tracking-[0.2em] uppercase">
-                    {pick.placeInfo?.alias || pick.alias || 'Location'}
+                <h4 className="text-lg font-bold text-white">{authorName}</h4>
+                <Link
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    pick.locationName ||
+                      pick.placeDetails?.name ||
+                      pick.alias ||
+                      "",
+                  )}`}
+                  target="_blank"
+                  className="flex items-center gap-2 mt-1 text-zinc-500 hover:text-[#D4FF33] transition-colors group"
+                >
+                  <MapPin size={14} className="group-hover:animate-bounce" />
+                  <span className="text-xs font-bold uppercase tracking-widest">
+                    {pick.locationName ||
+                      pick.placeDetails?.name ||
+                      (typeof pick.place === "string" ? pick.place : "") ||
+                      "Location:"}
+
+                    {/* Display Alias if it exists and is different from the name */}
+                    {pick.alias && pick.alias !== pick.locationName && (
+                      <span className="ml-1 text-[#D4FF33]/70">
+                        ({pick.alias})
+                      </span>
+                    )}
                   </span>
-                </div>
+                </Link>
               </div>
             </div>
 
-            <div className="relative">
-              <button 
-                onClick={() => setShowOptions(!showOptions)} 
-                className="w-10 h-10 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-white transition-all"
-              >
-                <MoreHorizontal size={20} />
-              </button>
-
-              {showOptions && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#141416] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
-                  <button onClick={handleDelete} className="w-full flex items-center gap-3 px-5 py-4 text-red-400 hover:bg-red-500/10 text-[11px] font-black uppercase tracking-widest transition-colors">
-                    <Trash2 size={14} /> Delete Pick
-                  </button>
-                </div>
+            <div className="flex items-center gap-4">
+              {/* DELETE BUTTON - Protocol: Terminology "Delete" [2026-02-01] */}
+              {isAuthor && (
+                <button
+                  onClick={onDeleteClick}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                >
+                  <Trash2 size={12} />
+                  Delete
+                </button>
               )}
+
+              <div className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-2">
+                <Star size={18} className="fill-[#D4FF33] text-[#D4FF33]" />
+                <span className="text-lg font-black text-white">
+                  {pick.stars?.toFixed(1) || "0.0"}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* DESCRIPTION */}
-          <div className="px-9 pb-6">
-            <p className="text-[17px] text-zinc-200 leading-relaxed font-medium">
+          {/* MEDIA SLIDER */}
+          <div className="px-8 relative group/media">
+            <div className="relative aspect-video w-full rounded-[2.5rem] overflow-hidden bg-black shadow-inner">
+              {renderMedia(
+                mediaFiles[currentIndex],
+                "w-full h-full object-cover",
+              )}
+
+              {mediaFiles.length > 1 && (
+                <>
+                  <button
+                    onClick={prevMedia}
+                    className="absolute left-6 top-1/2 -translate-y-1/2 p-3 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-[#D4FF33] hover:text-black transition-all z-10"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <button
+                    onClick={nextMedia}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 p-3 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-[#D4FF33] hover:text-black transition-all z-10"
+                  >
+                    <ChevronRight size={24} />
+                  </button>
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                    {mediaFiles.map((_: any, i: number) => (
+                      <div
+                        key={i}
+                        className={`h-1.5 rounded-full transition-all ${i === currentIndex ? "w-6 bg-[#D4FF33]" : "w-1.5 bg-white/30"}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="absolute top-6 right-6 p-4 bg-black/50 backdrop-blur-md rounded-2xl text-white opacity-0 group-hover/media:opacity-100 transition-opacity"
+              >
+                <Maximize2 size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* BOTTOM CONTENT */}
+          <div className="p-12">
+            <p className="text-zinc-300 text-xl font-medium leading-relaxed mb-12">
               {pick.description}
             </p>
-          </div>
 
-          {/* MEDIA: SQUARE CONTAINER */}
-          <div className="px-8">
-            <div 
-              onClick={() => setIsFullscreen(true)}
-              className="relative w-full aspect-square rounded-[32px] overflow-hidden bg-zinc-950 border border-white/5 cursor-zoom-in group/media"
-            >
-              <MediaSlider urls={pick.mediaUrls || []} />
-              
-              {/* Expand Hint Overlay */}
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                 <span className="text-white/70 text-[10px] font-black uppercase tracking-[0.3em] bg-black/60 px-5 py-2.5 rounded-full backdrop-blur-md border border-white/10">
-                   Click to Expand
-                 </span>
-              </div>
+            <div className="flex items-center justify-between pt-10 border-t border-white/5">
+              <button
+                onClick={onVoteClick}
+                className={`flex items-center gap-4 px-8 py-4 rounded-3xl border transition-all ${
+                  voteStatus === "up"
+                    ? "bg-[#D4FF33] border-[#D4FF33] text-black shadow-lg scale-105"
+                    : "bg-white/5 border-white/10 text-white hover:border-white/20"
+                }`}
+              >
+                <ChevronUp size={28} strokeWidth={3} />
+                <span className="text-lg font-black">{voteCount} Votes</span>
+              </button>
 
-              <div className="absolute top-5 right-5 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10">
-                <Star size={12} className="text-[#D4FF33]" fill="currentColor" />
-                <span className="text-sm font-black text-white">{stars}.0</span>
+              <div className="flex gap-10">
+                {/* SAVE BUTTON */}
+                <button
+                  onClick={onFavoriteClick}
+                  disabled={isPending}
+                  className={`flex flex-col items-center gap-2 transition-all active:scale-90 ${isFavorited ? "text-pink-500" : "text-zinc-500 hover:text-white"}`}
+                >
+                  <div
+                    className={`p-5 rounded-3xl bg-white/5 border border-white/10 transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/50" : "hover:border-white/30"}`}
+                  >
+                    <Heart
+                      size={28}
+                      className={
+                        isFavorited
+                          ? "fill-pink-500 text-pink-500"
+                          : "text-zinc-500"
+                      }
+                    />
+                  </div>
+                  <span className="text-xs font-bold uppercase">
+                    {isFavorited ? "Saved" : "Save"}
+                  </span>
+                </button>
+
+                {/* COMMENTS BUTTON */}
+                <button className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90">
+                  <div className="p-5 rounded-3xl bg-white/5 border border-white/10 hover:border-white/30 transition-all">
+                    <MessageCircle size={28} />
+                  </div>
+                  <span className="text-xs font-bold uppercase">
+                    {pick.commentCount || 0} Comments
+                  </span>
+                </button>
+
+                {/* SHARE BUTTON - Integrated with Clipboard + Sonner */}
+                <button
+                  onClick={onShareClick}
+                  className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90"
+                >
+                  <div className="p-5 rounded-3xl bg-white/5 border border-white/10 hover:border-[#D4FF33]/40 transition-all">
+                    <Share2 size={28} />
+                  </div>
+                  <span className="text-xs font-bold uppercase">Share</span>
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* FOOTER */}
-          <div className="px-8 py-8 flex items-center gap-4">
-            <div className="flex items-center bg-white/[0.03] border border-white/[0.08] rounded-[24px] p-1.5 shrink-0">
-              <button onClick={() => setVote(vote === 'up' ? null : 'up')} className={`p-3.5 rounded-[18px] transition-all duration-300 ${vote === 'up' ? 'bg-[#D4FF33] text-black shadow-[0_0_20px_rgba(212,255,51,0.4)]' : 'text-zinc-500 hover:text-white'}`}>
-                <ArrowBigUp size={24} fill={vote === 'up' ? 'currentColor' : 'none'} />
-              </button>
-              <span className={`px-5 text-lg font-black min-w-[50px] text-center tabular-nums ${vote === 'up' ? 'text-[#D4FF33]' : 'text-white'}`}>{score}</span>
-              <button onClick={() => setVote(vote === 'down' ? null : 'down')} className={`p-3.5 rounded-[18px] transition-all duration-300 ${vote === 'down' ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'text-zinc-500 hover:text-white'}`}>
-                <ArrowBigDown size={24} fill={vote === 'down' ? 'currentColor' : 'none'} />
-              </button>
-            </div>
-
-            <button className="flex-1 h-[68px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-[24px] flex items-center justify-center gap-3 text-zinc-400 hover:text-white transition-all font-black uppercase tracking-[0.2em] text-[11px]">
-              <MessageSquare size={18} /> Discuss
-            </button>
-
-            <button onClick={handleRedirect} className="w-[68px] h-[68px] bg-white/[0.03] hover:bg-[#D4FF33]/10 border border-white/[0.08] rounded-[24px] flex items-center justify-center text-zinc-500 hover:text-[#D4FF33] transition-all">
-              <ExternalLink size={20} />
-            </button>
           </div>
         </div>
       </div>
 
-      {/* FULLSCREEN VIEW */}
-      {isFullscreen && (
-        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300">
-          <button 
-            onClick={() => setIsFullscreen(false)}
-            className="absolute top-8 right-8 w-14 h-14 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/50 hover:text-white transition-all z-[110]"
+      {/* FULLSCREEN LIGHTBOX */}
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[999] bg-black/98 flex items-center justify-center"
           >
-            <X size={32} />
-          </button>
-          <div className="w-full h-full max-w-6xl flex items-center justify-center">
-            {/* Reusing slider but at full scale */}
-            <MediaSlider urls={pick.mediaUrls || []} />
-          </div>
-        </div>
-      )}
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="absolute top-10 right-10 text-white p-4 bg-white/10 rounded-full z-[1000] hover:bg-white hover:text-black transition-all"
+            >
+              <X size={32} />
+            </button>
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {renderMedia(
+                mediaFiles[currentIndex],
+                "max-w-full max-h-full object-contain rounded-xl shadow-2xl",
+                true,
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
-}
+};

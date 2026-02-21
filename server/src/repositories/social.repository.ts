@@ -1,34 +1,44 @@
-import Upvote from '../models/engagement.model';
 import Pick from '../models/pick.model';
+import mongoose from 'mongoose';
 
 export const socialRepository = {
   /**
-   * UPVOTE/DOWNVOTE: Toggles the support signal.
+   * TOGGLE CONSENSUS: Handles the atomic upvote signal.
+   * This ensures the counter and user list are ALWAYS in sync.
    */
   async toggleUpvote(userId: string, pickId: string) {
-    const existing = await Upvote.findOne({ user: userId, pick: pickId });
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    
+    // 1. Check if user already signaled consensus
+    const pick = await Pick.findById(pickId);
+    if (!pick) throw new Error("Transmission not found");
 
-    if (existing) {
-      // DELETE existing signal
-      await Upvote.findByIdAndDelete(existing._id);
-      await Pick.findByIdAndUpdate(pickId, { $inc: { upvoteCount: -1 } });
-      return { action: 'deleted', status: false };
-    } else {
-      // CREATE new signal
-      await Upvote.create({ user: userId, pick: pickId });
-      await Pick.findByIdAndUpdate(pickId, { $inc: { upvoteCount: 1 } });
-      return { action: 'created', status: true };
-    }
-  },
+    const hasUpvoted = pick.upvotes.includes(userObjectId);
 
-  /**
-   * CONSENSUS: Increments the comment count.
-   */
-  async incrementCommentCount(pickId: string) {
-    return await Pick.findByIdAndUpdate(
-      pickId, 
-      { $inc: { commentCount: 1 } }, 
+    // 2. Atomic Update: Uses $addToSet to prevent duplicates and $inc for the count
+    const update = hasUpvoted 
+      ? { $pull: { upvotes: userObjectId }, $inc: { upvoteCount: -1 } }
+      : { $addToSet: { upvotes: userObjectId }, $inc: { upvoteCount: 1 } };
+
+    const updatedPick = await Pick.findByIdAndUpdate(
+      pickId,
+      update,
       { new: true }
     );
+
+    return {
+      success: true,
+      status: !hasUpvoted, // true if now upvoted
+      count: updatedPick?.upvoteCount || 0,
+      action: hasUpvoted ? 'cleared' : 'signaled'
+    };
+  },
+
+  async incrementCommentCount(pickId: string) {
+    return await Pick.findByIdAndUpdate(pickId, { $inc: { commentCount: 1 } }, { new: true });
+  },
+
+  async decrementCommentCount(pickId: string) {
+    return await Pick.findByIdAndUpdate(pickId, { $inc: { commentCount: -1 } }, { new: true });
   }
 };

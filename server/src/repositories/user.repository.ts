@@ -1,4 +1,5 @@
 import { IUser, UserModel } from '../models/user.model';
+import mongoose from 'mongoose';
 
 export interface IUserRepository {
   findByEmail(email: string): Promise<IUser | null>;
@@ -6,58 +7,84 @@ export interface IUserRepository {
   getUserById(userId: string): Promise<IUser | null>;
   updateUser(userId: string, updateData: Partial<IUser>): Promise<IUser | null>;
   deleteUser(userId: string): Promise<IUser | null>;
-  getAllUsers(): Promise<IUser[]>; // Added for Admin functionality
+  getAllUsers(): Promise<IUser[]>;
+  follow(followerId: string, targetId: string): Promise<void>;
+  unfollow(followerId: string, targetId: string): Promise<void>;
+  isFollowing(followerId: string, targetId: string): Promise<boolean>;
 }
 
 export class UserRepository implements IUserRepository {
-  /**
-   * Finds a user by email for authentication purposes.
-   */
   async findByEmail(email: string): Promise<IUser | null> {
     return await UserModel.findOne({ email });
   }
 
-  /**
-   * Persists a new user to the database.
-   */
   async create(userData: Partial<IUser>): Promise<IUser> {
-    const user = new UserModel(userData);
-    return await user.save();
+    return await new UserModel(userData).save();
   }
 
-  /**
-   * Retrieves a user by their MongoDB ObjectId.
-   */
   async getUserById(userId: string): Promise<IUser | null> {
-    return await UserModel.findById(userId);
+    return await UserModel.findById(userId).select("-password");
   }
 
-  /**
-   * Updates user data and returns the document *after* the update.
-   */
-  async updateUser(userId: string, updateData: any): Promise<IUser | null> {
+  async updateUser(userId: string, updateData: Partial<IUser>): Promise<IUser | null> {
     return await UserModel.findByIdAndUpdate(userId, updateData, { 
-        new: true,
-        runValidators: true 
+      new: true, 
+      runValidators: true 
     });
   }
 
   /**
-   * Permanently removes a user from the database.
+   * Permanently deletes a user from the database.
    */
   async deleteUser(userId: string): Promise<IUser | null> {
     return await UserModel.findByIdAndDelete(userId);
   }
 
-  /**
-   * Retrieves all users for the Admin Management table.
-   */
   async getAllUsers(): Promise<IUser[]> {
-    // Exclude password for security
     return await UserModel.find().select("-password").sort({ createdAt: -1 });
   }
 
+  /**
+   * SOCIAL: Handles both follow and unfollow logic to reduce code duplication.
+   * Uses atomic increments to keep counts in sync.
+   */
+  private async updateSocialConnection(
+    followerId: string, 
+    targetId: string, 
+    isFollow: boolean
+  ): Promise<void> {
+    const operator = isFollow ? '$addToSet' : '$pull';
+    const increment = isFollow ? 1 : -1;
+
+    await Promise.all([
+      // Update Follower: Modify 'following' list and count
+      UserModel.findByIdAndUpdate(followerId, {
+        [operator]: { following: targetId },
+        $inc: { followingCount: increment }
+      }),
+      // Update Target: Modify 'followers' list and count
+      UserModel.findByIdAndUpdate(targetId, {
+        [operator]: { followers: followerId },
+        $inc: { followerCount: increment }
+      })
+    ]);
+  }
+
+  async follow(followerId: string, targetId: string): Promise<void> {
+    await this.updateSocialConnection(followerId, targetId, true);
+  }
+
+  async unfollow(followerId: string, targetId: string): Promise<void> {
+    await this.updateSocialConnection(followerId, targetId, false);
+  }
+
+  async isFollowing(followerId: string, targetId: string): Promise<boolean> {
+    const user = await UserModel.findOne({ _id: followerId, following: targetId });
+    return !!user;
+  }
+
+  // Alias for findByEmail to match interface naming
   async getUserByEmail(email: string): Promise<IUser | null> {
-    return await UserModel.findOne({ email });
+    return this.findByEmail(email);
   }
 }

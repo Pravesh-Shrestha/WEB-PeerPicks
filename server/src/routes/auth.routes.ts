@@ -9,7 +9,7 @@ const authController = new AuthController();
 router.post("/register", authController.signup);
 router.post("/login", authController.login);
 
-router.get("/whoami", authorizedMiddleware, authController.getUserProfile);
+router.get("/me", authorizedMiddleware, authController.getUserProfile);
 
 
 router.put("/update-profile", authorizedMiddleware, uploads.single('profilePicture'), authController.updateUserProfile);
@@ -17,7 +17,8 @@ router.put("/update-profile", authorizedMiddleware, uploads.single('profilePictu
 router.post("/request-password-reset", authController.sendResetPasswordEmail);
 router.post("/reset-password/:token", authController.resetPassword);
 
-
+// Backend: routes/user.routes.ts
+router.get("/profile/:id", authController.getUserProfile);
 
 
 export default router;

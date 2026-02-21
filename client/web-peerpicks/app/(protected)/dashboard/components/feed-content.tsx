@@ -1,74 +1,134 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getDiscoveryFeed } from "@/lib/actions/pick-actions";
-import { PickCard } from "./shared/pick-card"; // Adjusted to match your folder structure
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { PickCard } from "./shared/pick-card";
+import { getDiscoveryFeed } from "@/lib/actions/pick-action";
+import { useAuth } from "@/app/context/AuthContext";
+import { useDashboard } from "@/app/context/DashboardContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
-interface FeedContentProps {
-  filter: 'all' | 'following';
+interface FeedProps {
+  type: "foryou" | "following";
 }
 
-export default function FeedContent({ filter }: FeedContentProps) {
-  const [picks, setPicks] = useState<any[]>([]);
+export default function FeedContent({ type }: FeedProps) {
+  const { user } = useAuth();
+  const { refreshTicket } = useDashboard();
+  const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  
+  // Ref for Infinite Scroll trigger
+  const observerTarget = useRef(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  // 1. INSTANT REMOVAL LOGIC
+  const handleRemoveCard = useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((post) => post._id !== postId));
+  }, []);
+
+  // 2. SUCCESS NOTIFICATION HANDLER
+  // Called by PickCard to trigger the global Sonner toast at the top
+  const handleSaveSuccess = useCallback(() => {
+    toast.success("SIGNAL SAVED", {
+      description: "ARCHIVED TO REPOSITORY",
+      icon: <div className="w-1.5 h-1.5 bg-[#D4FF33] rounded-full animate-pulse" />,
+    });
+  }, []);
+
+  const fetchFeedData = useCallback(async (isInitial = false) => {
+    if (isInitial) {
+      setLoading(true);
+      setPage(1);
+      setHasMore(true);
+    }
+
+    const currentPage = isInitial ? 1 : page;
+    
     try {
-      // Synchronizing with the dashboard's filter state
-      const result = await getDiscoveryFeed(filter);
-      
-      if (result.success) {
-        // Ensuring we grab the data array from the signal response
-        setPicks(result.data || []);
+      const result = await getDiscoveryFeed(currentPage, 10);
+      const newPosts = result?.data || (Array.isArray(result) ? result : []);
+
+      if (newPosts.length === 0) {
+        setHasMore(false);
+      } else {
+        setPosts((prev) => (isInitial ? newPosts : [...prev, ...newPosts]));
+        setPage((prev) => (isInitial ? 2 : prev + 1));
       }
-    } catch (error) {
-      console.error("Consensus Transmission Error:", error);
+    } catch (error: any) {
+      console.error("Feed Fetch Error:", error);
+      // Handle Rate Limiting visually
+      if (error.response?.status === 429) {
+        toast.error("SYSTEM OVERLOAD", {
+          description: "RATE LIMIT DETECTED. RETRYING...",
+        });
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
 
+  // 3. INFINITE SCROLL OBSERVER (With Loading Guard)
   useEffect(() => {
-    loadData();
-  }, [filter]); // Re-fetches when toggling Home vs Following
-
-  if (loading) {
-    return (
-      <div className="py-32 flex flex-col items-center justify-center gap-6">
-        <div className="relative">
-          <div className="w-12 h-12 border-2 border-[#D4FF33]/10 border-t-[#D4FF33] rounded-full animate-spin" />
-          <div className="absolute inset-0 w-12 h-12 border-2 border-[#D4FF33]/5 rounded-full blur-sm" />
-        </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D4FF33] animate-pulse">
-          Synchronizing Data Nodes...
-        </p>
-      </div>
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Essential check: prevents 429 errors by ensuring only one fetch happens at a time
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          fetchFeedData();
+        }
+      },
+      { threshold: 0.1 }
     );
-  }
 
-  if (!picks || picks.length === 0) {
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [fetchFeedData, hasMore, loading]);
+
+  // Initial Sync
+  useEffect(() => {
+    fetchFeedData(true);
+  }, [refreshTicket, fetchFeedData]);
+
+  if (loading && posts.length === 0) {
     return (
-      <div className="py-24 text-center border border-white/5 rounded-[40px] bg-gradient-to-b from-white/[0.02] to-transparent">
-        <div className="mb-4 opacity-20 flex justify-center">
-          <div className="w-1 h-8 bg-[#D4FF33] rounded-full animate-bounce" />
-        </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">
-          No Intelligence Detected in this Sector
-        </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="w-full aspect-[4/5] bg-[#09090B] border border-white/[0.03] animate-pulse rounded-[2.5rem]" />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-12 pb-32">
-      {picks.map((pick: any) => (
-        <PickCard 
-          key={pick._id} 
-          pick={pick} 
-          onUpdate={loadData} // Triggers re-fetch on delete
-        />
-      ))}
+    <div className="flex flex-col gap-8 pb-24 max-w-2xl mx-auto">
+      <AnimatePresence mode="popLayout">
+        {posts.map((post) => (
+          <motion.div
+            key={post._id}
+            layout
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
+          >
+            <PickCard
+              pick={post}
+              onDeleteSuccess={() => handleRemoveCard(post._id)}
+              onSaveSuccess={handleSaveSuccess} 
+            />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* INFINITE SCROLL TRIGGER */}
+      <div ref={observerTarget} className="h-20 flex items-center justify-center">
+        {hasMore && posts.length > 0 && (
+          <div className="w-2 h-2 rounded-full bg-[#D4FF33] animate-ping" />
+        )}
+      </div>
     </div>
   );
 }

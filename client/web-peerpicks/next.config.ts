@@ -7,27 +7,28 @@ const nextConfig: NextConfig = {
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '3000',
+        port: '3000', // The PORT where the backend serves images
         pathname: '/uploads/**',
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
+        protocol: 'http',
+        hostname: '192.168.0.105', // Your Network IP
+        port: '3000',
+        pathname: '/uploads/**',
       }
     ],
   },
-  // ADD THIS REWRITES SECTION
   async rewrites() {
     return [
       {
-        // When you use <img src="/uploads/image.jpg" />
-        source: '/uploads/:path*',
-        destination: 'http://localhost:3000/uploads/:path*',
+        // Maps frontend:3004/api to backend:3000/api
+        source: '/api/:path*',
+        destination: 'http://192.168.0.105:3000/api/:path*', 
       },
       {
-        // When you fetch('/api/auth/update-profile')
-        source: '/api/:path*',
-        destination: 'http://localhost:3000/api/:path*',
+        // Maps frontend:3004/uploads to backend:3000/uploads
+        source: '/uploads/:path*',
+        destination: 'http://192.168.0.105:3000/uploads/:path*',
       },
     ];
   },
