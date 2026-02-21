@@ -1,37 +1,14 @@
-import { Router } from 'express';
-import { notificationService } from '../services/notification.service';
-import { authorizedMiddleware } from '../middlewares/authorized.middleware';
+import express from 'express';
+import { notificationController } from '../controllers/notification.controller';
+import { authorizedMiddleware } from '../middlewares/authorized.middleware';  
 
-const router = Router();
+const router = express.Router();
 
-/**
- * GET /api/notifications
- * Retrieves the activity feed for the logged-in user.
- */
-router.get('/', authorizedMiddleware, async (req, res) => {
-  try {
-    const userId = (req as any).user._id || (req as any).user.id;
-    const alerts = await notificationService.getUserNotifications(userId);
-    
-    res.status(200).json({ success: true, data: alerts });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to sync alerts." });
-  }
-});
+// All notification operations require an active session
+router.use(authorizedMiddleware);
 
-/**
- * PATCH /api/notifications/read-all
- * Marks all pending alerts as viewed.
- */
-router.patch('/read-all', authorizedMiddleware, async (req, res) => {
-  try {
-    const userId = (req as any).user._id || (req as any).user.id;
-    await notificationService.markAsRead(userId);
-    
-    res.status(200).json({ success: true, message: "Alerts cleared." });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to update alert status." });
-  }
-});
+router.get('/', notificationController.getMyNotifications);
+router.patch('/read', notificationController.markRead);
+router.delete('/:id', notificationController.deleteNotification); // Delete Protocol [2026-02-01]
 
 export default router;

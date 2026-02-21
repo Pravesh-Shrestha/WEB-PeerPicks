@@ -1,46 +1,49 @@
 import Notification from '../models/notification.model';
 import { HttpError } from '../errors/http-error';
+import { socketGateway } from '../gateways/socket.gateway';
 
 export const notificationService = {
-  /**
-   * CREATE: Generates a new system alert.
-   * We don't throw errors here to ensure the main action (like voting) 
-   * doesn't fail just because a notification couldn't be saved.
-   */
   createNotification: async (data: any) => {
     try {
-      // Force conversion to string if possible, or use the ID property
       const recipientId = data.recipient?._id?.toString() || data.recipient?.toString();
       const actorId = data.actor?._id?.toString() || data.actor?.toString();
 
-      if (!recipientId || !actorId) return null;
+      if (!recipientId || !actorId || recipientId === actorId) return null;
 
-      return await Notification.create({
-        ...data,
-        recipient: recipientId,
-        actor: actorId
-      });
+      const newNotification = await Notification.findOneAndUpdate(
+        { recipient: recipientId, actor: actorId, type: data.type, pickId: data.pickId },
+        { ...data, read: false, createdAt: new Date() },
+        { upsert: true, new: true }
+      ).populate('actor', 'fullName profilePicture');
+
+      // 🔥 REAL-TIME SIGNAL PUSH
+      if (newNotification) {
+        socketGateway.sendNotification(recipientId, newNotification);
+      }
+
+      return newNotification;
     } catch (error) {
-      // This console.log is what you're seeing in your terminal
       console.error("Notification Engine Error:", error);
-      return null; // Return null so the controller continues
+      return null;
     }
   },
 
-  /**
-   * READ: Fetch alerts for the current Node.
-   */
   async getUserNotifications(userId: string) {
     return await Notification.find({ recipient: userId })
-      .populate('actor', 'fullName profilePicture') // Hydrate actor details
-      .populate('pickId', 'description')            // Context for the alert
+      .populate('actor', 'fullName profilePicture')
+      .populate('pickId', 'description mediaUrls') // Added mediaUrls to show a thumbnail in the UI
       .sort({ createdAt: -1 })
-      .limit(20);
+      .limit(20)
+      .lean(); // Use lean for faster read-only queries
   },
 
   /**
-   * UPDATE: Mark all as read
+   * PROTOCOL COMPLIANT: Delete notification [2026-02-01]
    */
+  async deleteNotification(notificationId: string, userId: string) {
+    return await Notification.deleteOne({ _id: notificationId, recipient: userId });
+  },
+
   async markAsRead(userId: string) {
     return await Notification.updateMany(
       { recipient: userId, read: false },
