@@ -39,7 +39,7 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
 
         const userId = decoded.id || decoded._id || decoded.sub;
         // 4. Validate user exists in DB
-        const user = await userRepository.getUserById(userId);
+        const user = await userRepository.getUserById(userId.toString());
         if (!user) {
             throw new HttpError(401, "User no longer exists");
         }

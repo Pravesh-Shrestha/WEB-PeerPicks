@@ -3,22 +3,40 @@ import { AuthService } from "../services/auth.service";
 import { signupDTO, loginDTO, updateUserDTO } from "../dtos/auth.dto";
 import { HttpError } from "../errors/http-error";
 import { pickService } from "../services/pick.service";
+import { notificationRepository } from "../repositories/notification.repository";
 
 const authService = new AuthService();
 
 export class AuthController {
+  /**
+   * SIGNUP PROTOCOL: Creates user and initializes isolated welcome signal.
+   */
   async signup(req: Request, res: Response) {
     try {
       const validatedData = signupDTO.parse(req.body);
       const user = await authService.register(validatedData);
 
+      /**
+       * INITIALIZE NODE: Welcome Signal [2026-02-01]
+       * Triggers a dedicated notification for the new user ID.
+       */
+      try {
+        if (user && user._id) {
+          // Pass the string version of ObjectId for repository compatibility
+          await notificationRepository.createWelcomeNotification(
+            user._id.toString()
+          );
+        }
+      } catch (notifyError) {
+        console.error("WELCOME_SIGNAL_FAILED:", notifyError);
+      }
+
       res.status(201).json({
         success: true,
-        message: "Registration successful",
+        message: "Registration successful. Welcome to PeerPicks!",
         user,
       });
     } catch (error: any) {
-      // Zod errors contain an 'issues' or 'errors' array
       const message = error.errors ? error.errors[0].message : error.message;
       res.status(400).json({
         success: false,

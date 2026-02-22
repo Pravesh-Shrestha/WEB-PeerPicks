@@ -11,20 +11,33 @@ const axiosInstance = axios.create({
     // Flexible content-type is correct, especially for your FormData 'picks'
 });
 
+// axios.ts
 axiosInstance.interceptors.request.use(async (config) => {
     const token = await getAuthToken();
-    if (token && config.headers) {
+    
+    // CRITICAL: Only attach if token is a truthy string and NOT "null"
+    if (token && token !== "null" && token !== "undefined" && config.headers) {
         config.headers['Authorization'] = `Bearer ${token}`;
+    } else if (config.headers) {
+        // Ensure no stale header is left during login attempts
+        delete config.headers['Authorization'];
     }
     return config;
 }, (error) => Promise.reject(error));
 
+// axios.ts - Update the response interceptor
 axiosInstance.interceptors.response.use(
-    (response) => response.data, // PRO TIP: Unwrap .data here so your components get the clean object
+    (response) => response.data,
     (error) => {
         if (error.response?.status === 401) {
-            console.warn('Node session expired. Re-authenticating...');
-            // In a real app, you'd trigger a logout function from your AuthContext here
+            console.warn('Node session expired. Clearing identity...');
+            // CRITICAL: Wipe the header so the next user doesn't use it
+            delete axiosInstance.defaults.headers.common['Authorization'];
+            
+            // If you have access to window, you can force a hard reload
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

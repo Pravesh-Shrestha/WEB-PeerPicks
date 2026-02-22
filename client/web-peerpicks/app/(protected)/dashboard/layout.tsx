@@ -5,7 +5,10 @@ import Sidebar from './components/sidebar';
 import ProfilePanel from './components/shared/right-profile-card';
 import { DashboardProvider } from '@/app/context/DashboardContext';
 
+
 export default function UniversalDashboardLayout({ children }: { children: React.ReactNode }) {
+
+
   return (
     <DashboardProvider>
       {/* Root Container: #020203 ensures no grayish bleeding at the edges */}

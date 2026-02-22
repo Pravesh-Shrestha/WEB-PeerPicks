@@ -1,53 +1,93 @@
-import Notification from '../models/notification.model';
-import { HttpError } from '../errors/http-error';
-import { socketGateway } from '../gateways/socket.gateway';
+import { notificationController } from '../controllers/notification.controller';
+import { notificationRepository } from '../repositories/notification.repository';
 
 export const notificationService = {
-  createNotification: async (data: any) => {
-    try {
-      const recipientId = data.recipient?._id?.toString() || data.recipient?.toString();
-      const actorId = data.actor?._id?.toString() || data.actor?.toString();
+  /**
+   * Primary method for creating any signal (Social, Welcome, or System)
+   * Integrates DB persistence with Real-time SSE Broadcast.
+   */
+  async createNotification(data: any) {
+    const recipientId = data.recipient?.toString();
+    const actorId = data.actor?.toString();
 
-      if (!recipientId || !actorId || recipientId === actorId) return null;
+    // 1. Prevent self-notifications unless it's a Welcome/System message
+    if (recipientId === actorId && !['WELCOME', 'SYSTEM'].includes(data.type)) return null;
 
-      const newNotification = await Notification.findOneAndUpdate(
-        { recipient: recipientId, actor: actorId, type: data.type, pickId: data.pickId },
-        { ...data, read: false, createdAt: new Date() },
-        { upsert: true, new: true }
-      ).populate('actor', 'fullName profilePicture');
+    // 2. Build uniqueness query to prevent signal spam (Upsert logic)
+    // For System/Welcome, we use the message itself as part of the uniqueness check
+    const query = {
+      recipient: recipientId,
+      type: data.type,
+      ...(actorId && { actor: actorId }),
+      ...(data.pickId && { pickId: data.pickId }),
+      ...(data.type === 'SYSTEM' && { message: data.message })
+    };
 
-      // 🔥 REAL-TIME SIGNAL PUSH
-      if (newNotification) {
-        socketGateway.sendNotification(recipientId, newNotification);
-      }
+    // 3. Persist to Database via Repository
+    // This returns a lean, populated object
+    const notification = await notificationRepository.upsertSocialNotification(query, data);
 
-      return newNotification;
-    } catch (error) {
-      console.error("Notification Engine Error:", error);
-      return null;
+    // 4. SSE REAL-TIME BROADCAST
+    if (notification) {
+      // Map notification types to UI status colors for the Sonner toast
+      const statusMap: Record<string, string> = {
+        VOTE: 'success',
+        COMMENT: 'info',
+        SAVE: 'warning',
+        WELCOME: 'success',
+        SYSTEM: 'info'
+      };
+
+      /**
+       * VETERAN FIX: Ensure 'message' is never null for the frontend.
+       * If the DB didn't have a message but it's a known type, we provide the fallback
+       * string here so the SSE broadcast carries the text.
+       */
+      const broadcastPayload = {
+        ...notification,
+        status: data.status || statusMap[data.type] || 'info',
+        message: notification.message || data.message || this.generateFallbackMessage(notification)
+      };
+
+      notificationController.broadcastToUser(recipientId, broadcastPayload);
+      
+      // Return the payload with the message for any immediate caller logic
+      return broadcastPayload;
     }
-  },
 
-  async getUserNotifications(userId: string) {
-    return await Notification.find({ recipient: userId })
-      .populate('actor', 'fullName profilePicture')
-      .populate('pickId', 'description mediaUrls') // Added mediaUrls to show a thumbnail in the UI
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean(); // Use lean for faster read-only queries
+    return notification;
   },
 
   /**
-   * PROTOCOL COMPLIANT: Delete notification [2026-02-01]
+   * Helper to ensure the "No Text" issue is killed at the source.
    */
-  async deleteNotification(notificationId: string, userId: string) {
-    return await Notification.deleteOne({ _id: notificationId, recipient: userId });
+  generateFallbackMessage(n: any) {
+    switch (n.type) {
+      case 'VOTE': return 'upvoted your pick';
+      case 'COMMENT': return 'replied to your review';
+      case 'SAVE': return 'bookmarked your content';
+      case 'FOLLOW': return 'started following you';
+      case 'WELCOME': return 'Welcome to PeerPicks! Your node is active.';
+      default: return 'New signal received.';
+    }
   },
 
-  async markAsRead(userId: string) {
-    return await Notification.updateMany(
-      { recipient: userId, read: false },
-      { $set: { read: true } }
-    );
+  async getUserSignals(userId: string) {
+    return await notificationRepository.findByUserId(userId);
+  },
+
+  async getUnreadSignalCount(userId: string) {
+    return await notificationRepository.getUnreadCount(userId);
+  },
+
+  /**
+   * PROTOCOL COMPLIANT: Delete Signal [2026-02-01]
+   */
+  async deleteSignal(id: string, userId: string) {
+    return await notificationRepository.deleteById(id, userId);
+  },
+
+  async syncReadStatus(userId: string) {
+    return await notificationRepository.markAllAsRead(userId);
   }
 };

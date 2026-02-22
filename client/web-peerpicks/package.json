@@ -17,6 +17,7 @@
     "@mui/material": "^7.3.7",
     "@mui/x-date-pickers": "^8.25.0",
     "axios": "^1.13.2",
+    "date-fns": "^4.1.0",
     "dayjs": "^1.11.19",
     "framer-motion": "^12.27.0",
     "jwt-decode": "^4.0.0",

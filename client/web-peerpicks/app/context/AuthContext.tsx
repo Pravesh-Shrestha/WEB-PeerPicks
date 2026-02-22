@@ -31,27 +31,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   const checkAuth = useCallback(async () => {
-    // We don't set loading(true) here to avoid flickering the whole UI
-    // every time a component checks the session.
     try {
-      const token = await getAuthToken();
+      const storedToken = await getAuthToken();
       const userData = await getUserData();
 
-      // Log for debugging (Remove in production)
-      console.log("Auth Sync - Token:", !!token, "User:", userData?.email);
-
-      if (token && userData) {
+      if (storedToken && userData) {
         setUser(userData);
-        setToken(token);
+        setToken(storedToken);
         setIsAuthenticated(true);
-      } else if (!token) {
-        // ONLY set false if the token is actually gone
+      } else {
+        // If either is missing, ensure state is wiped
         setIsAuthenticated(false);
         setUser(null);
+        setToken(null);
       }
     } catch (err) {
+      console.error("AUTH_SYNC_ERROR", err);
       setIsAuthenticated(false);
       setUser(null);
+      setToken(null);
     } finally {
       setLoading(false);
     }
@@ -61,18 +59,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, [checkAuth]);
 
+  /**
+   * PROTOCOL COMPLIANT: Delete local identity [2026-02-01]
+   * Using window.location.href ensures a complete memory wipe, 
+   * preventing one user's SSE signals from leaking into another's session.
+   */
   const logout = async () => {
     try {
-      // 1. Immediate UI wipe
-      setIsAuthenticated(false);
-      setUser(null);
-
-      // 2. Explicitly DELETE all local persistence
+      // 1. Explicitly DELETE all local persistence
       await clearAuthCookies();
 
-      // 3. Clear browser cache/state for the route
-      router.replace("/login");
-      router.refresh();
+      // 2. Immediate UI Wipe
+      setIsAuthenticated(false);
+      setUser(null);
+      setToken(null);
+
+      // 3. HARD REFRESH: Clears Axios headers and React heap
+      window.location.href = "/login"; 
     } catch (error) {
       console.error("Logout Protocol Error:", error);
     }
@@ -91,10 +94,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         token,
       }}
     >
-      {/* Only render children once the initial loading check is done 
-                to prevent protected pages from flashing private data.
-            */}
-      {!loading && children}
+      {/* VETERAN MOVE: By showing children only after !loading, we prevent 
+        protected dashboard components from mounting with a 'null' user.
+      */}
+      {!loading ? children : (
+        <div className="flex h-screen w-full items-center justify-center bg-black font-mono text-[#D4FF33] uppercase tracking-[0.3em]">
+          Initializing_Node...
+        </div>
+      )}
     </AuthContext.Provider>
   );
 };

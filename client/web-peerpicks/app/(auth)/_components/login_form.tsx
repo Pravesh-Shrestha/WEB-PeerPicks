@@ -66,7 +66,7 @@ export default function LoginForm() {
         router.push("/dashboard");
       } else {
         setIsSuccess(false);
-        setMessage(result?.message || "INVALID SIGNAL: ACCESS DENIED");
+        setMessage("message" in result ? result.message || "INVALID SIGNAL: ACCESS DENIED" : "INVALID SIGNAL: ACCESS DENIED");
       }
     } catch (err: any) {
       setIsSuccess(false);

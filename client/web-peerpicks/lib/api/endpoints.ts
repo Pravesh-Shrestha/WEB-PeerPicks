@@ -26,7 +26,7 @@ export const API = {
     DISCUSSION: (id: string) => `/api/picks/${id}/discussion`,
     COMMENT: (id: string) => `/api/social/comment/${id}`,
     VOTE: (id: string) => `/api/social/vote/${id}`,
- 
+
     // Favorites
     FAVORITE: (id: string) => `/api/social/favorite/${id}`, // Toggle action
     MY_FAVORITES: "/api/social/favorites", // To fetch the list
@@ -37,22 +37,29 @@ export const API = {
     USER_PICKS: (userId: string) => `/api/picks/user/${userId}`,
     DETAIL: (id: string) => `/api/picks/${id}`,
 
-    // Ownership (Using "delete" term as requested)
+    // Ownership (Protocol Compliance: "delete" [2026-02-01])
     DELETE: (id: string) => `/api/picks/${id}`,
     UPDATE: (id: string) => `/api/picks/${id}`,
   },
 
   ADMIN: {
-    // Preserved Admin Routes
     USERS: "/api/admin/users",
     STATS: "/api/admin/dashboard-stats",
   },
 
-  // NEW SYSTEM ENDPOINTS
+  /**
+   * NOTIFICATION SYSTEM
+   * Updated to match Controller logic and Delete Protocol
+   */
   NOTIFICATIONS: {
     BASE: "/api/notifications",
-    READ_ALL: "/api/notifications/read-all",
+    STREAM: "/api/notifications/stream", // The SSE Bridge
+    GET_ALL: "/api/notifications",       // To fetch the full signal feed
+    UNREAD_COUNT: "/api/notifications/unread-count",
+    MARK_READ: "/api/notifications/read", 
+    DELETE: (id: string) => `/api/notifications/${id}`, 
   },
+
   MAP: {
     NEARBY: "/api/map/nearby",
   },

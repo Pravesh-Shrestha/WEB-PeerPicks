@@ -1,37 +1,36 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import fs from 'fs';
-import { UserRepository } from '../repositories/user.repository';
-import { SignupDTO, LoginDTO, UpdateUserDTO } from '../dtos/auth.dto';
-import { JWT_SECRET } from '../config/index';
-import { HttpError } from '../errors/http-error';
-import { sendEmail } from '../config/email';
-import path from 'path';
-const CLIENT_URL = process.env.CLIENT_URL as string || 'http://localhost:3004';
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import fs from "fs";
+import { UserRepository } from "../repositories/user.repository";
+import { SignupDTO, LoginDTO, UpdateUserDTO } from "../dtos/auth.dto";
+import { JWT_SECRET } from "../config/index";
+import { HttpError } from "../errors/http-error";
+import { sendEmail } from "../config/email";
+import path from "path";
+const CLIENT_URL =
+  (process.env.CLIENT_URL as string) || "http://localhost:3004";
 const userRepository = new UserRepository();
 
 export class AuthService {
   async register(data: SignupDTO) {
-    // 1. Check for existing user
     const existingUser = await userRepository.findByEmail(data.email);
     if (existingUser) throw new Error("User already exists");
 
-    // 2. Hash the password
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    // 3. Destructure to remove fields that shouldn't be in the DB
-    // If your SignupDTO includes 'confirmPassword', destructure it out here:
-    const { ...userData } = data;
+    // VETERAN MOVE: Use destructuring to ensure unwanted fields (like confirmPassword)
+    // are stripped before saving to the database.
+    const { password, ...safeData } = data;
 
-    // 4. Create the user in MongoDB
     const userDataToCreate = {
-      ...userData,
+      ...safeData,
       password: hashedPassword,
-      profilePicture: userData.profilePicture || undefined,
+      // Ensure profilePicture is either a string or undefined
+      profilePicture: data.profilePicture || undefined,
     };
+
     return await userRepository.create(userDataToCreate);
   }
-
   async login(data: LoginDTO) {
     const user = await userRepository.findByEmail(data.email);
 
@@ -87,34 +86,39 @@ export class AuthService {
   }
   async updateUser(userId: string, data: UpdateUserDTO) {
     const user = await userRepository.getUserById(userId);
-    if (!user) {
-      throw new HttpError(404, "User not found");
-    }
+    if (!user) throw new HttpError(404, "User not found");
 
-    // 1. Email uniqueness check
     if (data.email && user.email !== data.email) {
       const emailExists = await userRepository.findByEmail(data.email);
-      if (emailExists) {
-        throw new HttpError(409, "Email already exists");
-      }
+      if (emailExists) throw new HttpError(409, "Email already exists");
     }
 
-    // 2. Password hashing
     if (data.password) {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    // 3. PHYSICAL FILE CLEANUP (New Logic)
-    // If a new profile picture is being uploaded, delete the old one
-    if (data.profilePicture && user.profilePicture) {
+    /**
+     * STORAGE CLEANUP [2026-02-01]
+     * Explicitly DELETE old profile assets when a new one is uploaded
+     * to prevent your local storage from bloating.
+     */
+    if (
+      data.profilePicture &&
+      user.profilePicture &&
+      data.profilePicture !== user.profilePicture
+    ) {
       const oldPath = path.join(__dirname, "../../", user.profilePicture);
       if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath); // Use "delete" logic for storage cleanup
+        try {
+          fs.unlinkSync(oldPath);
+          console.log(`CLEANUP_SUCCESS: Deleted old asset at ${oldPath}`);
+        } catch (err) {
+          console.error("CLEANUP_ERROR:", err);
+        }
       }
     }
 
-    const updatedUser = await userRepository.updateUser(userId, data);
-    return updatedUser;
+    return await userRepository.updateUser(userId, data);
   }
   async sendResetPasswordEmail(email?: string) {
     if (!email) {
@@ -154,4 +158,3 @@ export class AuthService {
     }
   }
 }
-

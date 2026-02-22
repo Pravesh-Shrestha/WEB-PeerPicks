@@ -78,11 +78,14 @@ export const handleLogout = async () => {
  */
 export const handleWhoAmI = async () => {
     try {
-        const response = await axiosInstance.get(API.AUTH.WHOAMI);
-        return { success: true, data: response.data };
+        const res: any = await axiosInstance.get(API.AUTH.WHOAMI);
+        // If your controller returns { user: {...} }, grab res.user
+        // If it returns the user directly, just use res
+        const userData = res.user || res; 
+        
+        return { success: true, data: userData };
     } catch (error: any) {
-        // Log the exact URL being hit to help debugging
-        console.error(`WhoAmI 404 at: ${error.config?.url}`); 
+        console.error(`[AUTH_SYNC_FAILURE]: 404 at ${error.config?.url}`); 
         return { success: false, message: "Endpoint not found" };
     }
 };
@@ -93,7 +96,7 @@ export const handleUpdateProfile = async (formData: any) => {
         if (result.success) {
             await setUserData(result.data);
             // Revalidate the profile path so the new image/name shows up immediately
-            revalidatePath("/profile/[id]", "page"); 
+            revalidatePath("user/profile");
             return { success: true, message: "Profile updated successfully", data: result.data };
         }
         return { success: false, message: result.message || "Update failed" };

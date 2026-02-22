@@ -12,6 +12,7 @@
   "dependencies": {
     "@types/nodemailer": "^7.0.9",
     "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -22,7 +23,6 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.13",
-    "socket.io": "^4.8.3",
     "sonner": "^2.0.7",
     "ts-jest": "^29.4.6",
     "uuid": "^11.1.0",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
