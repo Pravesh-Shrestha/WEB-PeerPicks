@@ -9,26 +9,21 @@ import {
   Heart,
   Bell,
   UserPlus,
+  ArrowUpRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import router from "next/router";
+import { useRouter } from "next/navigation"; // Fixed: Use navigation for App Router
 
 const SignalIcon = ({ type }: { type: string }) => {
+  const iconSize = 16;
   switch (type) {
-    case "WELCOME":
-      return <Zap className="text-[#D4FF33]" size={18} />;
-    case "SYSTEM":
-      return <ShieldCheck className="text-blue-400" size={18} />;
-    case "VOTE":
-      return <Heart className="text-pink-500" size={18} />;
-    case "COMMENT":
-      return <MessageSquare className="text-indigo-400" size={18} />;
-    case "SAVE":
-      return <Bell className="text-amber-400" size={18} />;
-    case "FOLLOW":
-      return <UserPlus className="text-emerald-400" size={18} />;
-    default:
-      return <Zap size={18} />;
+    case "WELCOME": return <Zap className="text-[#D4FF33]" size={iconSize} />;
+    case "SYSTEM": return <ShieldCheck className="text-blue-400" size={iconSize} />;
+    case "VOTE": return <Heart className="text-pink-500" size={iconSize} />;
+    case "COMMENT": return <MessageSquare className="text-indigo-400" size={iconSize} />;
+    case "SAVE": return <Bell className="text-amber-400" size={iconSize} />;
+    case "FOLLOW": return <UserPlus className="text-emerald-400" size={iconSize} />;
+    default: return <Zap className="text-[#D4FF33]" size={iconSize} />;
   }
 };
 
@@ -39,15 +34,16 @@ export const NotificationItem = ({
   n: any;
   onDelete: (id: string, isUnread: boolean) => void;
 }) => {
+  const router = useRouter();
   const isSpecial = n.type === "WELCOME" || n.type === "SYSTEM";
 
   const handleSignalClick = () => {
+    // Navigate to the dynamic pick detail page
     if (n.pickId) {
-      router.push(`/picks/${n.pickId}`);
+      router.push(`/dashboard/picks/${n.pickId}`);
     }
   };
 
-  // IDENTITY ISOLATION LOGIC
   const getActorLabel = () => {
     if (n.type === "SYSTEM") return "SYSTEM_NODE";
     if (n.type === "WELCOME") return "PEERPICKS_TEAM";
@@ -57,80 +53,91 @@ export const NotificationItem = ({
   const getContent = () => {
     if (n.message && n.message !== "null") return n.message;
     switch (n.type) {
-      case "VOTE":
-        return "upvoted your pick";
-      case "COMMENT":
-        return "replied to your review";
-      case "FOLLOW":
-        return "started following you";
-      case "SAVE":
-        return "favorited your pick";
-      case "WELCOME":
-        return "Welcome to the node. Your signal is active.";
-      case "SYSTEM":
-        return "System protocol updated.";
-      default:
-        return "New signal established.";
+      case "VOTE": return "upvoted your pick.";
+      case "COMMENT": return "replied to your review.";
+      case "FOLLOW": return "started following you.";
+      case "SAVE": return "favorited your pick.";
+      case "WELCOME": return "Welcome to the node. Signal active.";
+      default: return "New signal established.";
     }
   };
 
   return (
     <div
-      className={`group relative flex items-center justify-between p-5 rounded-[2rem] border transition-all ${
+      className={`group relative flex items-center gap-5 p-5 rounded-[1.5rem] border transition-all duration-500 ${
         n.read
-          ? "bg-transparent border-white/[0.03]"
-          : "bg-white/[0.05] border-[#D4FF33]/20 shadow-[0_0_20px_rgba(212,255,51,0.05)]"
+          ? "bg-transparent border-white/[0.03] hover:bg-white/[0.02] hover:border-white/10"
+          : "bg-[#D4FF33]/[0.02] border-[#D4FF33]/10 shadow-[0_0_30px_rgba(212,255,51,0.03)] hover:bg-[#D4FF33]/[0.05]"
       }`}
     >
-      <div onClick={handleSignalClick} className="cursor-pointer ...">
-        {/* Notification content */}
-      </div>
-
-      <div className="flex gap-4 items-center">
-        <div className="relative">
-          {isSpecial ? (
-            <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-              <SignalIcon type={n.type} />
-            </div>
-          ) : (
+      {/* 1. Icon / Avatar Section */}
+      <div className="relative flex-shrink-0">
+        {isSpecial ? (
+          <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
+            <SignalIcon type={n.type} />
+          </div>
+        ) : (
+          <div className="relative">
             <img
               src={n.actor?.profilePicture || "/default-avatar.png"}
-              className="w-12 h-12 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all border border-white/10"
-              alt="Peer Avatar"
+              className="w-12 h-12 rounded-2xl object-cover grayscale group-hover:grayscale-0 transition-all duration-700 border border-white/10"
+              alt="Peer"
             />
-          )}
-          {!n.read && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#D4FF33] rounded-full animate-pulse border-2 border-black" />
-          )}
-        </div>
+            <div className="absolute -bottom-1 -right-1 p-1 bg-black rounded-lg border border-white/5">
+              <SignalIcon type={n.type} />
+            </div>
+          </div>
+        )}
+        {!n.read && (
+          <span className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-[#D4FF33] rounded-full animate-pulse shadow-[0_0_10px_#D4FF33]" />
+        )}
+      </div>
 
+      {/* 2. Text Content - Interactive Area */}
+      <div 
+        onClick={handleSignalClick} 
+        className="flex-1 cursor-pointer group/text"
+      >
         <div className="flex flex-col">
-          <p className="text-sm leading-tight">
-            <span className="font-bold text-white uppercase tracking-tight">
+          <p className="text-sm leading-snug">
+            <span className="font-black text-white uppercase tracking-tighter italic">
               {getActorLabel()}
             </span>
-            <span className="text-zinc-300 ml-2">{getContent()}</span>
+            <span className="text-zinc-400 ml-2 font-medium">
+              {getContent()}
+            </span>
           </p>
-          <span className="text-[10px] font-mono text-zinc-500 uppercase mt-1">
-            {n.createdAt
-              ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })
-              : "Just now"}{" "}
-            — NODE_SYNC
-          </span>
+          
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+              {n.createdAt ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }) : "Just now"}
+            </span>
+            <span className="w-1 h-1 rounded-full bg-zinc-800" />
+            <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+              NODE_SYNC
+            </span>
+            {n.pickId && (
+              <span className="flex items-center gap-1 text-[9px] font-black text-[#D4FF33] opacity-0 group-hover/text:opacity-100 transition-opacity uppercase ml-2">
+                View_Signal <ArrowUpRight size={10} />
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* DELETE PROTOCOL [2026-02-01] */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(n._id, !n.read);
-        }}
-        className="p-3 text-zinc-700 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all opacity-0 group-hover:opacity-100"
-        title="Delete Signal"
-      >
-        <Trash2 size={18} />
-      </button>
+      {/* 3. Action Section - DELETE PROTOCOL [2026-02-01] */}
+      <div className="flex-shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(n._id, !n.read);
+          }}
+          className="p-3 text-zinc-800 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
+          title="Delete Signal"
+        >
+          <Trash2 size={18} strokeWidth={2.5} />
+        </button>
+      </div>
     </div>
   );
 };

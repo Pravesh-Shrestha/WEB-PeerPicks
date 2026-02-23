@@ -32,15 +32,18 @@ export const createPick = async (formData: FormData) => {
 };
 /**
  * READ: Fetches the hydrated discussion thread
+ * Protocol: Corrects 404/Empty List by unwrapping nested data
  */
 export const getPickDiscussion = async (pickId: string) => {
   try {
-    const result = await axiosInstance.get(API.PICKS.DISCUSSION(pickId));
-    return result;
+    const url = API.PICKS.DISCUSSION(pickId);
+    const response: any = await axiosInstance.get(url);
+    
+    // Unwrapping: Axios (.data) -> Controller (.data)
+    // This returns the object { parent, signals, count } directly
+    return response.data?.data || response.data;
   } catch (error: any) {
-    if (error.response?.status === 404) {
-      return { success: true, data: [] };
-    }
+    console.error("PICK_ACTION_ERROR:", error.response?.status);
     throw error;
   }
 };
@@ -49,9 +52,9 @@ export const getPickDiscussion = async (pickId: string) => {
  * SOCIAL: Post a comment to a specific pick
  */
 export const postComment = async (pickId: string, description: string) => {
-  // Using the CREATE endpoint from our COMMENTS object
+  // Ensure the body key matches your backend controller (content vs description)
   const result = await axiosInstance.post(API.COMMENTS.CREATE, {
-    content: description,
+    content: description, 
     pickId: pickId,
   });
   return result;
@@ -114,7 +117,7 @@ export const getPlaceHubPicks = async (linkId: string) => {
 export const updatePick = async (pickId: string, updateData: any) => {
   const result = await axiosInstance.patch(
     API.PICKS.DETAIL(pickId),
-    updateData,
+    updateData, // Correctly handles { description: editContent }
   );
   return result;
 };
@@ -162,27 +165,27 @@ export const getNearbyPicks = async (
   return result;
 };
 
+/**
+ * FAVORITES: Handle Toggle Save
+ */
 export const handleToggleSave = async (pickId: string) => {
   try {
-    const response = await axiosInstance.post(API.PICKS.FAVORITE(pickId));
+    const response: any = await axiosInstance.post(API.PICKS.FAVORITE(pickId));
     
-    // Log exactly what the response looks like to find the missing key
-    console.log("FULL RESPONSE:", response); 
-
-    // If response.data is undefined, axios might not be parsing the JSON 
-    // or the backend is sending an empty body.
-    const isSaved = response?.data?.isFavorited ?? response?.data?.isSaved ?? false;
+    // Most backends return the NEW state after the toggle
+    // If it was saved, it returns isFavorited: true. 
+    // If it was unsaved, it returns isFavorited: false.
+    const isSaved = response?.data?.isFavorited ?? response?.isFavorited ?? false;
 
     return {
       success: true,
-      isFavorited: isSaved
+      isFavorited: isSaved // This is key for the animation logic
     };
   } catch (error: any) {
-    console.error("Action Error:", error.message);
+    console.error("FAVORITE_TOGGLE_FAILURE:", error);
     return { success: false, isFavorited: false };
   }
 };
-
 export const handleDeletePick = async (pickId: string) => {
   try {
     // Using the "delete" term as requested for the protocol

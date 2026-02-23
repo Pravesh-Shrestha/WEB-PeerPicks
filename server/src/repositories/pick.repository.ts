@@ -83,7 +83,7 @@ export const pickRepository = {
    */
   async findByParent(parentId: string) {
     return await Pick.find({
-      parentPick: new mongoose.Types.ObjectId(parentId),
+      parentPick: parentId,
     })
       .sort({ createdAt: 1 }) // Discussion flows chronologically
       .populate("user", "fullName profilePicture")

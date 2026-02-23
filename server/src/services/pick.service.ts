@@ -5,8 +5,10 @@ import { UserRepository } from "../repositories/user.repository"; // Added to ch
 import { HttpError } from "../errors/http-error";
 import { Types } from "mongoose";
 import { notificationRepository } from "repositories/notification.repository";
+import { CommentRepository } from "../repositories/comment.repository";
 
 const userRepo = new UserRepository();
+const commentRepo = new CommentRepository();
 
 // pick.service.ts
 
@@ -98,26 +100,23 @@ export const pickService = {
    */
 
   async getDiscussion(pickId: string, currentUserId?: string) {
-    // 1. Fetch the Parent Transmission to verify it exists
+    // 1. Fetch the parent pick details to satisfy the frontend loader
     const parent = await pickRepository.findById(pickId);
-    if (!parent)
-      throw new HttpError(404, "Target transmission node not found.");
+    if (!parent) throw new Error("PICK_NOT_FOUND");
 
-    // 2. Fetch all children (comments) associated with this parent
-    // We sort by 'upvoteCount' to prioritize the strongest "Consensus Signals"
-    const comments = await pickRepository.findByParent(pickId);
+    // 2. Hydrate parent with user details and upvote status
+    const hydratedParent = await hydratePicks(parent, currentUserId);
 
-    // 3. Hydrate the entire thread
-    // This attaches 'hasUpvoted' and author node details to every comment
-    const hydratedComments = await hydratePicks(comments, currentUserId);
+    // 3. Fetch signals via the Repository instance
+    // The Repository's findByPickId already populates 'author'
+    const signals = await commentRepo.findByPickId(pickId);
 
     return {
-      parent: (await hydratePicks([parent], currentUserId))[0],
-      signals: hydratedComments, // Using 'signals' instead of 'comments' for originality
-      count: parent.commentCount,
+      parent: hydratedParent,
+      signals: signals,
+      commentCount: signals.length,
     };
   },
-
   /**
    * READ: Discovery Feed with interaction status
    */

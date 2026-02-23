@@ -25,6 +25,8 @@ axiosInstance.interceptors.request.use(async (config) => {
     return config;
 }, (error) => Promise.reject(error));
 
+
+
 // axios.ts - Update the response interceptor
 axiosInstance.interceptors.response.use(
     (response) => response.data,

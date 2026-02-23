@@ -14,7 +14,8 @@ export const socialController = {
   handleVote: async (req: Request, res: Response) => {
     try {
       const { pickId } = req.params;
-      const userId = (req as any).user.id;
+      // FIX: Use _id to match the identity object from middleware
+      const userId = (req as any).user._id; 
 
       const target = await pickRepository.findById(pickId);
       if (!target) {
@@ -26,7 +27,8 @@ export const socialController = {
       // ALERT SYSTEM: Only notify on a NEW signal
       if (result.action === "signaled") {
         await notificationService.createNotification({
-          recipient: target.user.toString(),
+          // Ensure recipient is a string ID
+          recipient: target.user._id ? target.user._id.toString() : target.user.toString(),
           actor: userId.toString(),
           type: "VOTE",
           pickId: pickId,
@@ -41,7 +43,8 @@ export const socialController = {
           action: result.action,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("VOTE_SIGNAL_ERROR:", error.message);
       return res.status(500).json({ success: false, message: "Error processing support signal." });
     }
   },
@@ -52,17 +55,18 @@ export const socialController = {
   toggleFollow: async (req: Request, res: Response) => {
     try {
       const { targetUserId } = req.params;
-      const followerId = (req as any).user.id;
+      const followerId = (req as any).user._id; // FIX: Use _id
 
       const isFollowing = await userRepo.isFollowing(followerId, targetUserId);
 
       if (isFollowing) {
+        // [2026-02-01] Protocol Compliance: Delete the connection
         await userRepo.unfollow(followerId, targetUserId);
       } else {
         await userRepo.follow(followerId, targetUserId);
         await notificationService.createNotification({
           recipient: targetUserId,
-          actor: followerId,
+          actor: followerId.toString(),
           type: "FOLLOW",
         });
       }
@@ -79,7 +83,7 @@ export const socialController = {
   toggleFavorite: async (req: Request, res: Response) => {
     try {
       const { pickId } = req.params;
-      const userId = (req as any).user.id;
+      const userId = (req as any).user._id; // FIX: Use _id
 
       const target = await pickRepository.findById(pickId);
       if (!target) {
@@ -92,8 +96,8 @@ export const socialController = {
         const recipientId = target.user._id ? target.user._id.toString() : target.user.toString();
         await notificationService.createNotification({
           recipient: recipientId,
-          actor: userId,
-          type: "VOTE", // Corrected type for favoriting/saving
+          actor: userId.toString(),
+          type: "VOTE", 
           pickId: pickId,
         });
       }
@@ -113,7 +117,7 @@ export const socialController = {
    */
   getMyFavorites: async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as any).user._id; // FIX: Use _id
       const favorites = await favoriteRepository.findUserFavorites(userId);
       return res.status(200).json({ success: true, data: favorites });
     } catch (error) {

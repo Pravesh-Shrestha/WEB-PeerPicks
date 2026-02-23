@@ -23,13 +23,15 @@ router.get('/category/:category', pickController.getPicksByCategory);
 // 4. Fetch all picks (Admin/Global)
 router.get('/', pickController.getAllPicks);
 
+// 6. Discussion: Fetch comments for a specific pick
+// Ensure this matches API.COMMENTS.GET_BY_PICK in endpoints.ts
+router.get('/:id/discussion', pickController.getPickDiscussion);
+
 // 5. Individual Review details 
 // This is dynamic, so it stays below static paths
 router.get('/:id', pickController.getPick);
 
-// 6. Discussion: Fetch comments for a specific pick
-// Ensure this matches API.COMMENTS.GET_BY_PICK in endpoints.ts
-router.get('/:id/discussion', pickController.getPickDiscussion);
+
 
 /**
  * PROTECTED ROUTES (Requires Token)

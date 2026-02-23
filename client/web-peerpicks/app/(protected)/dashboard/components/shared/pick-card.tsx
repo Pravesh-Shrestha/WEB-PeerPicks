@@ -13,6 +13,8 @@ import {
   X,
   Heart,
   Trash2,
+  Edit3,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getMediaUrl } from "@/lib/utils";
@@ -20,17 +22,20 @@ import {
   handleVote,
   handleDeletePick,
   handleToggleSave,
+  updatePick, // Ensure this exists in your pick-action.ts
 } from "@/lib/actions/pick-action";
 import { useAuth } from "@/app/context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 
 interface PickCardProps {
   pick: any;
   currentUserId?: string;
   onDeleteSuccess?: () => void;
   onSaveSuccess?: () => void;
+  onUpdateSuccess?: () => void;
   initialIsFavorited?: boolean;
 }
 
@@ -39,12 +44,28 @@ export const PickCard = ({
   initialIsFavorited,
   onDeleteSuccess,
   onSaveSuccess,
+  onUpdateSuccess,
 }: PickCardProps) => {
   const { user: currentUser } = useAuth();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  // --- IDENTITY & TIME RESOLUTION ---
+  const currentId = currentUser?._id || currentUser?.id;
+  const authorId = pick.user?._id || pick.user?.id || pick.user;
+  const isAuthor =
+    currentId && authorId && currentId.toString() === authorId.toString();
+
+  // Protocol [2026-02-23]: Format creation date
+  const timestamp = pick.createdAt
+    ? formatDistanceToNow(new Date(pick.createdAt), {
+        addSuffix: true,
+      }).toUpperCase()
+    : "SIGNAL_ESTABLISHED";
+
   // --- STATE ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(pick.description);
   const [voteStatus, setVoteStatus] = useState<"up" | null>(
     pick.hasUpvoted ? "up" : null,
   );
@@ -54,7 +75,16 @@ export const PickCard = ({
   const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Sync favorited state if props change (useful for feed updates)
+  // Sync states when pick data refreshes
+  useEffect(() => {
+    if (pick.hasUpvoted !== undefined) {
+      setVoteStatus(pick.hasUpvoted ? "up" : null);
+    }
+    if (pick.upvoteCount !== undefined) {
+      setVoteCount(pick.upvoteCount);
+    }
+  }, [pick.hasUpvoted, pick.upvoteCount]);
+
   useEffect(() => {
     if (!isPending) {
       setIsFavorited(initialIsFavorited || false);
@@ -62,8 +92,6 @@ export const PickCard = ({
   }, [initialIsFavorited, isPending]);
 
   // --- HELPERS ---
-  const isAuthor =
-    currentUser?.id === pick.user?._id || currentUser?._id === pick.user?._id;
   const authorName = pick.user?.fullName || pick.user?.name || "Anonymous User";
   const authorAvatar = getMediaUrl(pick.user?.profilePicture, "profilePicture");
   const mediaFiles = pick.mediaUrls || [];
@@ -82,73 +110,107 @@ export const PickCard = ({
 
   // --- ACTIONS ---
   const onVoteClick = async () => {
+    if (!currentId)
+      return toast.error("AUTH_REQUIRED", { description: "Login to vote." });
+
     const isUpvoted = voteStatus === "up";
+    // Optimistic Update
     setVoteStatus(isUpvoted ? null : "up");
     setVoteCount((prev: number) => (isUpvoted ? prev - 1 : prev + 1));
 
     try {
-      await handleVote(pick._id);
+      const res = await handleVote(pick._id);
+      if (res?.data?.upvoteCount !== undefined) {
+        setVoteCount(res.data.upvoteCount);
+      }
     } catch (error) {
-      // Revert on failure
       setVoteStatus(isUpvoted ? "up" : null);
       setVoteCount((prev: number) => (isUpvoted ? prev + 1 : prev - 1));
       toast.error("SIGNAL INTERRUPTED", { description: "VOTE FAILED TO SYNC" });
     }
   };
 
-  const onFavoriteClick = async () => {
-    if (isPending) return;
+  const onToggleSave = async () => {
+    const newFavoritedState = !isFavorited;
+    setIsFavorited(newFavoritedState);
 
-    startTransition(async () => {
-      try {
-        const result = await handleToggleSave(pick._id);
+    try {
+      const result = await handleToggleSave(pick._id);
 
-        if (result?.success) {
-          setIsFavorited(result.isFavorited);
-
-          if (result.isFavorited) {
-            if (onSaveSuccess) onSaveSuccess();
-            // Optional: Delay removal if viewing from a specific "vault" context
-            setTimeout(() => {
-              if (
-                onDeleteSuccess &&
-                window.location.pathname.includes("vault")
-              ) {
-                onDeleteSuccess();
-              }
-            }, 1400);
-          } else {
-            if (onDeleteSuccess) onDeleteSuccess();
-          }
+      if (result.success) {
+        if (result.isFavorited === false && onDeleteSuccess) {
+          onDeleteSuccess();
+        } else if (result.isFavorited === true && onSaveSuccess) {
+          onSaveSuccess();
         }
-      } catch (error: any) {
-        if (error.response?.status === 429) {
-          toast.error("SYSTEM BUSY", { description: "TOO MANY REQUESTS" });
-        }
+      } else {
+        setIsFavorited(!newFavoritedState);
+        toast.error("SYNC_ERROR", { description: "VAULT_CONNECTION_FAILED" });
       }
-    });
+    } catch (error) {
+      setIsFavorited(!newFavoritedState);
+      toast.error("VAULT_FAILURE");
+    }
+  };
+
+  const onUpdatePick = async () => {
+    // 1. Validate: Block empty signals or redundant updates
+    const cleanContent = editContent?.trim();
+    if (!cleanContent || cleanContent === pick.description) {
+      setIsEditing(false);
+      setEditContent(pick.description); // Reset local state just in case
+      return;
+    }
+
+    try {
+      // 2. Transmit: Execute the modification protocol
+      const result: any = await updatePick(pick._id, {
+        description: cleanContent,
+      });
+
+      // 3. Resolve: Handle server confirmation
+      // Checking for success in result or result.data depending on your interceptor setup
+      if (result?.success || result?.data?.success) {
+        toast.success("SIGNAL_MODIFIED", {
+          description: "SYSTEM_DESCRIPTION_UPDATED",
+        });
+
+        // 4. Persistence: Update local reference and exit mode
+        pick.description = cleanContent;
+        setIsEditing(false);
+
+        // Refresh the server-side state to keep the feed synced
+        router.refresh();
+      } else {
+        throw new Error("SERVER_REJECTION");
+      }
+    } catch (error) {
+      // 5. Rollback: Maintain signal stability on failure
+      toast.error("UPDATE_FAILED", {
+        description: "SIGNAL_STABILITY_ERROR - REVERTING_CHANGES",
+      });
+      setEditContent(pick.description);
+      setIsEditing(false);
+    }
   };
 
   const onDeleteClick = async () => {
-    // Protocol Compliance: Terminology "Delete" [2026-02-01]
+    // Protocol Compliance [2026-02-01]
     const confirmed = confirm(
       "CONFIRM PROTOCOL: Delete this pick from the system?",
     );
-
     if (confirmed) {
       try {
         const result = await handleDeletePick(pick._id);
         if (result.success) {
-          toast.success("PICK DELETED", {
-            description: "DATA REMOVED FROM GLOBAL FEED",
+          toast.success("SIGNAL DELETED", {
+            description: "DATA REMOVED FROM FEED",
           });
           if (onDeleteSuccess) onDeleteSuccess();
           router.refresh();
         }
       } catch (error: any) {
-        toast.error("DELETE FAILED", {
-          description: error.message || "INTERNAL SYSTEM ERROR",
-        });
+        toast.error("DELETE FAILED");
       }
     }
   };
@@ -156,10 +218,7 @@ export const PickCard = ({
   const onShareClick = () => {
     const url = `${window.location.origin}/dashboard/picks/${pick._id}`;
     navigator.clipboard.writeText(url);
-    toast.info("LINK COPIED", {
-      description: "SIGNAL URL SAVED TO CLIPBOARD",
-      icon: <Share2 size={14} className="text-[#D4FF33]" />,
-    });
+    toast.info("LINK COPIED");
   };
 
   const renderMedia = (url: string, className: string, autoPlay = true) => {
@@ -195,11 +254,19 @@ export const PickCard = ({
                 />
               </div>
               <div>
-                <h4 className="text-lg font-bold text-white">{authorName}</h4>
+                <div className="flex items-center gap-3">
+                  <h4 className="text-lg font-bold text-white">{authorName}</h4>
+                  {/* Timestamp Protocol */}
+                  <span className="text-[10px] font-mono text-zinc-600 tracking-tighter uppercase">
+                    {pick.createdAt
+                      ? formatDistanceToNow(new Date(pick.createdAt), {
+                          addSuffix: true,
+                        })
+                      : "SIGNAL_LIVE"}
+                  </span>
+                </div>
                 <Link
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    pick.locationName || pick.placeDetails?.name || "",
-                  )}`}
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pick.locationName || pick.placeDetails?.name || "")}`}
                   target="_blank"
                   className="flex items-center gap-2 mt-1 text-zinc-500 hover:text-[#D4FF33] transition-colors group"
                 >
@@ -208,25 +275,39 @@ export const PickCard = ({
                     {pick.locationName ||
                       pick.placeDetails?.name ||
                       "Unknown Sector"}
-                    {pick.alias && pick.alias !== pick.locationName && (
-                      <span className="ml-1 text-[#D4FF33]/70">
-                        ({pick.alias})
-                      </span>
-                    )}
+                    {pick.alias &&
+                      pick.alias !==
+                        (pick.locationName || pick.placeDetails?.name) && (
+                        <span className="ml-1 text-[#D4FF33]/70">
+                          ({pick.alias})
+                        </span>
+                      )}
                   </span>
                 </Link>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {isAuthor && (
-                <button
-                  onClick={onDeleteClick}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95"
-                >
-                  <Trash2 size={12} />
-                  Delete
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Edit Toggle Button */}
+                  <button
+                    onClick={() => {
+                      setIsEditing(!isEditing);
+                      setEditContent(pick.description);
+                    }}
+                    className={`p-3 rounded-xl border transition-all ${isEditing ? "bg-[#D4FF33] border-[#D4FF33] text-black" : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:border-white/30"}`}
+                  >
+                    {isEditing ? <X size={16} /> : <Edit3 size={16} />}
+                  </button>
+                  <button
+                    onClick={onDeleteClick}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                  >
+                    <Trash2 size={12} />
+                    Delete
+                  </button>
+                </div>
               )}
               <div className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-2">
                 <Star size={18} className="fill-[#D4FF33] text-[#D4FF33]" />
@@ -239,10 +320,19 @@ export const PickCard = ({
 
           {/* MEDIA SLIDER */}
           <div className="px-8 relative group/media">
-            <div className="relative aspect-video w-full rounded-[2.5rem] overflow-hidden bg-black shadow-inner">
-              {renderMedia(
-                mediaFiles[currentIndex],
-                "w-full h-full object-cover",
+            <div
+              className="relative aspect-video w-full rounded-[2.5rem] overflow-hidden bg-black shadow-inner cursor-pointer"
+              onClick={() => setIsFullscreen(true)}
+            >
+              {mediaFiles.length > 0 ? (
+                renderMedia(
+                  mediaFiles[currentIndex],
+                  "w-full h-full object-cover",
+                )
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-700 uppercase font-black text-xs tracking-widest">
+                  No Media Payload
+                </div>
               )}
 
               {mediaFiles.length > 1 && (
@@ -259,21 +349,9 @@ export const PickCard = ({
                   >
                     <ChevronRight size={24} />
                   </button>
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                    {mediaFiles.map((_: any, i: number) => (
-                      <div
-                        key={i}
-                        className={`h-1.5 rounded-full transition-all ${i === currentIndex ? "w-6 bg-[#D4FF33]" : "w-1.5 bg-white/30"}`}
-                      />
-                    ))}
-                  </div>
                 </>
               )}
-
-              <button
-                onClick={() => setIsFullscreen(true)}
-                className="absolute top-6 right-6 p-4 bg-black/50 backdrop-blur-md rounded-2xl text-white opacity-0 group-hover/media:opacity-100 transition-opacity"
-              >
+              <button className="absolute top-6 right-6 p-4 bg-black/50 backdrop-blur-md rounded-2xl text-white opacity-0 group-hover/media:opacity-100 transition-opacity">
                 <Maximize2 size={20} />
               </button>
             </div>
@@ -281,62 +359,94 @@ export const PickCard = ({
 
           {/* CONTENT & ACTIONS */}
           <div className="p-12">
-            <p className="text-zinc-300 text-xl font-medium leading-relaxed mb-12">
-              {pick.description}
-            </p>
+            {isEditing ? (
+              <div className="mb-12 space-y-4">
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full bg-white/5 border border-[#D4FF33]/30 rounded-[2rem] p-8 text-xl text-white outline-none focus:border-[#D4FF33] transition-all min-h-[150px] italic font-medium"
+                  autoFocus
+                />
+                <button
+                  onClick={onUpdatePick}
+                  className="flex items-center gap-2 px-8 py-4 bg-[#D4FF33] text-black rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
+                >
+                  <Check size={16} strokeWidth={3} /> Commit_Changes
+                </button>
+              </div>
+            ) : (
+              <p className="text-zinc-300 text-xl font-medium leading-relaxed mb-12 italic">
+                "{pick.description}"
+              </p>
+            )}
 
             <div className="flex items-center justify-between pt-10 border-t border-white/5">
               <button
                 onClick={onVoteClick}
-                className={`flex items-center gap-4 px-8 py-4 rounded-3xl border transition-all ${
+                className={`flex items-center gap-4 px-8 py-4 rounded-3xl border transition-all active:scale-90 ${
                   voteStatus === "up"
-                    ? "bg-[#D4FF33] border-[#D4FF33] text-black shadow-lg scale-105"
-                    : "bg-white/5 border-white/10 text-white hover:border-white/20"
+                    ? "bg-[#D4FF33] border-[#D4FF33] text-black shadow-[0_0_20px_rgba(212,255,51,0.2)]"
+                    : "bg-white/5 border-white/10 text-white hover:border-white/30"
                 }`}
               >
-                <ChevronUp size={28} strokeWidth={3} />
-                <span className="text-lg font-black">{voteCount} Votes</span>
+                <motion.div
+                  animate={voteStatus === "up" ? { y: [0, -4, 0] } : { y: 0 }}
+                  transition={{
+                    repeat: voteStatus === "up" ? Infinity : 0,
+                    duration: 2,
+                  }}
+                >
+                  <ChevronUp size={28} strokeWidth={3} />
+                </motion.div>
+                <span className="text-lg font-black">{voteCount}</span>
               </button>
 
               <div className="flex gap-10">
                 <button
-                  onClick={onFavoriteClick}
-                  disabled={isPending}
-                  className={`flex flex-col items-center gap-2 transition-all active:scale-90 ${isFavorited ? "text-pink-500" : "text-zinc-500 hover:text-white"}`}
+                  onClick={onToggleSave}
+                  className={`flex flex-col items-center gap-2 transition-all group/vault ${isFavorited ? "text-pink-500" : "text-zinc-500 hover:text-white"}`}
                 >
-                  <div
-                    className={`p-5 rounded-3xl bg-white/5 border border-white/10 transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/50" : "hover:border-white/30"}`}
+                  <motion.div
+                    animate={
+                      isFavorited
+                        ? { scale: [1, 1.3, 1], rotate: [0, 15, 0] }
+                        : { scale: 1 }
+                    }
+                    transition={{ duration: 0.4, ease: "backOut" }}
+                    className={`p-5 rounded-3xl bg-white/5 border border-white/10 transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/50 shadow-[0_0_20px_rgba(236,72,153,0.15)]" : "group-hover/vault:border-white/30"}`}
                   >
                     <Heart
                       size={28}
-                      className={isFavorited ? "fill-pink-500" : ""}
+                      className={`transition-colors duration-300 ${isFavorited ? "fill-pink-500" : "fill-transparent"}`}
                     />
-                  </div>
-                  <span className="text-xs font-bold uppercase">
-                    {isFavorited ? "Saved" : "Save"}
+                  </motion.div>
+                  <span className="text-[10px] font-black uppercase tracking-tighter">
+                    {isFavorited ? "Stored" : "Vault"}
                   </span>
                 </button>
 
                 <button
                   onClick={() => router.push(`/dashboard/picks/${pick._id}`)}
-                  className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90"
+                  className="flex flex-col items-center gap-2 text-zinc-500 hover:text-[#D4FF33] group/signal"
                 >
-                  <div className="p-5 rounded-3xl bg-white/5 border border-white/10 hover:border-white/30 transition-all">
+                  <div className="p-5 rounded-3xl bg-white/5 border border-white/10 group-hover/signal:border-[#D4FF33]/40 transition-all">
                     <MessageCircle size={28} />
                   </div>
-                  <span className="text-xs font-bold uppercase">
-                    {pick.commentCount || 0} Comments
+                  <span className="text-[10px] font-black uppercase tracking-tighter">
+                    {pick.commentCount || 0} Signals
                   </span>
                 </button>
 
                 <button
                   onClick={onShareClick}
-                  className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90"
+                  className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white group/share"
                 >
-                  <div className="p-5 rounded-3xl bg-white/5 border border-white/10 hover:border-[#D4FF33]/40 transition-all">
+                  <div className="p-5 rounded-3xl bg-white/5 border border-white/10 group-hover/share:border-white/40 transition-all">
                     <Share2 size={28} />
                   </div>
-                  <span className="text-xs font-bold uppercase">Share</span>
+                  <span className="text-[10px] font-black uppercase tracking-tighter">
+                    Share
+                  </span>
                 </button>
               </div>
             </div>
@@ -344,7 +454,6 @@ export const PickCard = ({
         </div>
       </div>
 
-      {/* FULLSCREEN LIGHTBOX */}
       <AnimatePresence>
         {isFullscreen && (
           <motion.div
@@ -355,7 +464,7 @@ export const PickCard = ({
           >
             <button
               onClick={() => setIsFullscreen(false)}
-              className="absolute top-10 right-10 text-white p-4 bg-white/10 rounded-full z-[1000] hover:bg-white hover:text-black"
+              className="absolute top-10 right-10 text-white p-4 bg-white/10 rounded-full hover:bg-white hover:text-black transition-all"
             >
               <X size={32} />
             </button>
