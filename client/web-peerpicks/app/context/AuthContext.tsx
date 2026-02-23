@@ -19,6 +19,7 @@ interface AuthContextProps {
   logout: () => Promise<void>;
   loading: boolean;
   checkAuth: () => Promise<void>;
+  loginSync: (userData: any, token: string) => void; // Added for instant UI updates
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -30,6 +31,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  /**
+   * checkAuth: Synchronizes React state with Cookies.
+   * Useful on page load or after a manual refresh.
+   */
   const checkAuth = useCallback(async () => {
     try {
       const storedToken = await getAuthToken();
@@ -40,19 +45,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setToken(storedToken);
         setIsAuthenticated(true);
       } else {
-        // If either is missing, ensure state is wiped
         setIsAuthenticated(false);
         setUser(null);
         setToken(null);
       }
     } catch (err) {
       console.error("AUTH_SYNC_ERROR", err);
-      setIsAuthenticated(false);
-      setUser(null);
-      setToken(null);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  /**
+   * loginSync: Pushes identity data directly into state.
+   * This is the fix for the "must refresh" issue.
+   */
+  const loginSync = useCallback((userData: any, authToken: string) => {
+    setUser(userData);
+    setToken(authToken);
+    setIsAuthenticated(true);
+    // No need to set loading here as it's already false by the time a user logs in
   }, []);
 
   useEffect(() => {
@@ -61,20 +73,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * PROTOCOL COMPLIANT: Delete local identity [2026-02-01]
-   * Using window.location.href ensures a complete memory wipe, 
-   * preventing one user's SSE signals from leaking into another's session.
    */
   const logout = async () => {
     try {
-      // 1. Explicitly DELETE all local persistence
+      // 1. Explicitly DELETE all persistence
       await clearAuthCookies();
 
-      // 2. Immediate UI Wipe
+      // 2. Wipe UI state immediately
       setIsAuthenticated(false);
       setUser(null);
       setToken(null);
 
-      // 3. HARD REFRESH: Clears Axios headers and React heap
+      // 3. HARD DELETE: Clears memory heap and Axios headers
       window.location.href = "/login"; 
     } catch (error) {
       console.error("Logout Protocol Error:", error);
@@ -92,12 +102,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         checkAuth,
         token,
+        loginSync,
       }}
     >
-      {/* VETERAN MOVE: By showing children only after !loading, we prevent 
-        protected dashboard components from mounting with a 'null' user.
-      */}
-      {!loading ? children : (
+      {/* VETERAN MOVE: Prevent layout shift by waiting for checkAuth */}
+      {!loading ? (
+        children
+      ) : (
         <div className="flex h-screen w-full items-center justify-center bg-black font-mono text-[#D4FF33] uppercase tracking-[0.3em]">
           Initializing_Node...
         </div>

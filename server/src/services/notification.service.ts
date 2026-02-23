@@ -11,25 +11,39 @@ export const notificationService = {
     const actorId = data.actor?.toString();
 
     // 1. Prevent self-notifications unless it's a Welcome/System message
-    if (recipientId === actorId && !['WELCOME', 'SYSTEM'].includes(data.type)) return null;
+    if (recipientId === actorId && !['WELCOME', 'SYSTEM'].includes(data.type)) {
+      return null;
+    }
 
     // 2. Build uniqueness query to prevent signal spam (Upsert logic)
-    // For System/Welcome, we use the message itself as part of the uniqueness check
-    const query = {
+    // For social types (VOTE, COMMENT, SAVE), we group by actor and pickId.
+    // For WELCOME, it's unique to the recipient.
+    const query: any = {
       recipient: recipientId,
       type: data.type,
-      ...(actorId && { actor: actorId }),
-      ...(data.pickId && { pickId: data.pickId }),
-      ...(data.type === 'SYSTEM' && { message: data.message })
+      actor: actorId,
+      pickId: data.pickId,
     };
 
+    if (actorId) query.actor = actorId;
+    if (data.pickId) query.pickId = data.pickId;
+    
+    // For System/Welcome, include the message in the uniqueness check if provided
+    if (['SYSTEM', 'WELCOME'].includes(data.type) && data.message) {
+      query.message = data.message;
+    }
+
     // 3. Persist to Database via Repository
-    // This returns a lean, populated object
-    const notification = await notificationRepository.upsertSocialNotification(query, data);
+    // We pass the specific message requested or generate the fallback
+    const finalData = {
+      ...data,
+      message: data.message || this.generateFallbackMessage(data.type)
+    };
+
+    const notification = await notificationRepository.upsertSocialNotification(query, finalData);
 
     // 4. SSE REAL-TIME BROADCAST
     if (notification) {
-      // Map notification types to UI status colors for the Sonner toast
       const statusMap: Record<string, string> = {
         VOTE: 'success',
         COMMENT: 'info',
@@ -38,20 +52,15 @@ export const notificationService = {
         SYSTEM: 'info'
       };
 
-      /**
-       * VETERAN FIX: Ensure 'message' is never null for the frontend.
-       * If the DB didn't have a message but it's a known type, we provide the fallback
-       * string here so the SSE broadcast carries the text.
-       */
       const broadcastPayload = {
         ...notification,
         status: data.status || statusMap[data.type] || 'info',
-        message: notification.message || data.message || this.generateFallbackMessage(notification)
+        // Ensure the broadcast carries the same standardized message
+        message: notification.message || finalData.message
       };
 
       notificationController.broadcastToUser(recipientId, broadcastPayload);
       
-      // Return the payload with the message for any immediate caller logic
       return broadcastPayload;
     }
 
@@ -59,14 +68,14 @@ export const notificationService = {
   },
 
   /**
-   * Helper to ensure the "No Text" issue is killed at the source.
+   * Helper: Standardizes strings as per [2026-02-01] requirements.
    */
-  generateFallbackMessage(n: any) {
-    switch (n.type) {
-      case 'VOTE': return 'upvoted your pick';
-      case 'COMMENT': return 'replied to your review';
-      case 'SAVE': return 'bookmarked your content';
-      case 'FOLLOW': return 'started following you';
+  generateFallbackMessage(type: string) {
+    switch (type) {
+      case 'VOTE': return 'upvoted your pick.';
+      case 'COMMENT': return 'commented on your pick.';
+      case 'SAVE': return 'save your pick.';
+      case 'FOLLOW': return 'started following you.';
       case 'WELCOME': return 'Welcome to PeerPicks! Your node is active.';
       default: return 'New signal received.';
     }

@@ -1,44 +1,40 @@
+// repositories/social.repository.ts
 import Pick from '../models/pick.model';
 import mongoose from 'mongoose';
 
 export const socialRepository = {
-  /**
-   * TOGGLE CONSENSUS: Handles the atomic upvote signal.
-   * This ensures the counter and user list are ALWAYS in sync.
-   */
   async toggleUpvote(userId: string, pickId: string) {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    
-    // 1. Check if user already signaled consensus
-    const pick = await Pick.findById(pickId);
-    if (!pick) throw new Error("Transmission not found");
+    const userOID = new mongoose.Types.ObjectId(userId);
 
-    const hasUpvoted = pick.upvotes.includes(userObjectId);
-
-    // 2. Atomic Update: Uses $addToSet to prevent duplicates and $inc for the count
-    const update = hasUpvoted 
-      ? { $pull: { upvotes: userObjectId }, $inc: { upvoteCount: -1 } }
-      : { $addToSet: { upvotes: userObjectId }, $inc: { upvoteCount: 1 } };
-
-    const updatedPick = await Pick.findByIdAndUpdate(
-      pickId,
-      update,
-      { new: true }
+    // Atomic Toggle Logic:
+    // Try to remove first; if nModified is 0, then we add.
+    const pullResult = await Pick.updateOne(
+      { _id: pickId, upvotes: userOID },
+      { $pull: { upvotes: userOID }, $inc: { upvoteCount: -1 } }
     );
 
-    return {
-      success: true,
-      status: !hasUpvoted, // true if now upvoted
-      count: updatedPick?.upvoteCount || 0,
-      action: hasUpvoted ? 'cleared' : 'signaled'
-    };
+    let action = 'cleared';
+    let status = false;
+
+    if (pullResult.modifiedCount === 0) {
+      await Pick.updateOne(
+        { _id: pickId },
+        { $addToSet: { upvotes: userOID }, $inc: { upvoteCount: 1 } }
+      );
+      action = 'signaled';
+      status = true;
+    }
+
+    const updated = await Pick.findById(pickId).select('upvoteCount');
+    return { success: true, status, count: updated?.upvoteCount || 0, action };
   },
 
-  async incrementCommentCount(pickId: string) {
-    return await Pick.findByIdAndUpdate(pickId, { $inc: { commentCount: 1 } }, { new: true });
+async incrementCommentCount(pickId: string) {
+    return await Pick.findByIdAndUpdate(pickId, { $inc: { commentCount: 1 } });
   },
 
   async decrementCommentCount(pickId: string) {
-    return await Pick.findByIdAndUpdate(pickId, { $inc: { commentCount: -1 } }, { new: true });
+    // Protocol [2026-02-01]: Used during 'delete' actions
+    return await Pick.findByIdAndUpdate(pickId, { $inc: { commentCount: -1 } });
   }
 };

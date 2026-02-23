@@ -1,23 +1,28 @@
+// routes/social.route.ts
 import { Router } from "express";
 import { socialController } from "../controllers/social.controller";
 import { authorizedMiddleware } from "../middlewares/authorized.middleware";
 
 const router = Router();
 
-// Connections
+/**
+ * 1. CONNECTIONS
+ * Handles follower/following logic.
+ */
 router.post("/follow/:targetUserId", authorizedMiddleware, socialController.toggleFollow);
+router.post("/unfollow/:targetUserId", authorizedMiddleware, socialController.toggleFollow); 
 
-// Consensus (Voting)
+/**
+ * 2. CONSENSUS (VOTING)
+ * Maps to /api/social/vote/:id
+ */
 router.post("/vote/:pickId", authorizedMiddleware, socialController.handleVote);
 
-// Discussions
-router.post("/comment/:pickId", authorizedMiddleware, socialController.postComment);
-router.patch("/comment/:commentId", authorizedMiddleware, socialController.updateComment);
-router.delete("/comment/:commentId", authorizedMiddleware, socialController.deleteComment);
-
-// Favorites
-// Add this to your backend social.route.ts
-router.post("/favorite/:pickId", authorizedMiddleware, socialController.toggleFavorite);
+/**
+ * 3. FAVORITES (VAULT)
+ * Maps to /api/social/favorite/:id
+ */
 router.get("/favorites", authorizedMiddleware, socialController.getMyFavorites);
+router.post("/favorite/:pickId", authorizedMiddleware, socialController.toggleFavorite);
 
 export default router;

@@ -16,6 +16,7 @@ export const notificationRepository = {
     });
   },
 
+
   /**
    * Fetches the signal feed.
    * VETERAN FIX: Enhanced to ensure we don't send broken nodes to the frontend.
@@ -36,8 +37,7 @@ export const notificationRepository = {
         if (n.type === "VOTE") fallbackText = "upvoted your pick";
         if (n.type === "COMMENT") fallbackText = "replied to your review";
         if (n.type === "SAVE") fallbackText = "bookmarked your content";
-        if (n.type === "WELCOME")
-          fallbackText = "Welcome to PeerPicks! Your node is active.";
+        if (n.type === "WELCOME")fallbackText = "Welcome to PeerPicks! Your node is active.";
         if (n.type === "SYSTEM") fallbackText = "System maintenance alert.";
       }
 

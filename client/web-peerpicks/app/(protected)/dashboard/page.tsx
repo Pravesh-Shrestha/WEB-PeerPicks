@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import WelcomeHeader from './components/welcome-header';
 import { PickCard } from './components/shared/pick-card';
 import CreatePickTrigger from './components/shared/CreatePickTrigger';
@@ -8,25 +8,29 @@ import CreateReviewForm from './components/create_review_form';
 import { getDiscoveryFeed } from '@/lib/actions/pick-action';
 import { useAuth } from '@/app/context/AuthContext';
 
-
-
 export default function DashboardPage() {
-  const { user } = useAuth();
-
-
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  
   const [activeTab, setActiveTab] = useState<'following' | 'new'>('new');
   const [picks, setPicks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const currentUserId = user?._id; 
+  // Ref to prevent concurrent requests during the same render cycle
+  const isFetching = useRef(false);
 
   const fetchFeed = useCallback(async () => {
+    // 1. SIGNAL GUARD: Don't fetch if already in progress or auth isn't ready
+    if (isFetching.current || authLoading || !isAuthenticated) return;
+
+    isFetching.current = true;
     setLoading(true);
+    
     try {
+      // Pass the activeTab to your action if your backend supports it
       const result = await getDiscoveryFeed(1, 10); 
       
-      if (result && result.success && Array.isArray(result.data)) {
+      if (result?.success && Array.isArray(result.data)) {
         setPicks(result.data); 
       } else {
         setPicks([]);
@@ -36,12 +40,16 @@ export default function DashboardPage() {
       setPicks([]);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
-  }, []);
+  }, [authLoading, isAuthenticated]); // Dependencies are now stable
 
+  // 2. Controlled Effect Loop
   useEffect(() => {
     fetchFeed();
-  }, [fetchFeed, activeTab]);
+  }, [fetchFeed, activeTab]); 
+
+  const currentUserId = user?._id || user?.id;
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-20">
@@ -49,14 +57,13 @@ export default function DashboardPage() {
       
       <CreatePickTrigger onClick={() => setIsFormOpen(true)} />
 
-      {/* Modal Overlay for Creating Picks */}
       {isFormOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
            <div className="w-full max-w-4xl bg-[#09090B] rounded-[3rem] border border-white/10 shadow-2xl relative">
               <CreateReviewForm 
                 onSuccess={() => {
                   setIsFormOpen(false);
-                  fetchFeed(); // Refresh signal feed after creation
+                  fetchFeed(); 
                 }} 
                 onClose={() => setIsFormOpen(false)} 
               />
@@ -82,9 +89,8 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Feed Content */}
       <div className="space-y-8">
-        {loading ? (
+        {loading && picks.length === 0 ? (
           [1, 2, 3].map((i) => (
             <div key={i} className="w-full aspect-video bg-white/5 animate-pulse rounded-[2.5rem]" />
           ))
@@ -94,8 +100,7 @@ export default function DashboardPage() {
               key={pick._id}
               pick={pick}
               currentUserId={currentUserId}
-              // Protocol Compliance: onDeleteSuccess triggers a UI refresh
-              // ensuring deleted data is removed from the view immediately [2026-02-01]
+              // [2026-02-01] Protocol: Immediate UI sync after delete
               onDeleteSuccess={fetchFeed} 
             />
           ))

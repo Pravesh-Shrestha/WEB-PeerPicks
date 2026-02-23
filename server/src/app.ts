@@ -16,6 +16,7 @@ import adminBlogRouter from './routes/admin/blog.route';
 import socialRoutes from './routes/social.route';
 import notificationRoutes from './routes/notification.route';
 import mapRoutes from './routes/map.route';
+import commentRoutes from './routes/comment.route'; 
 
 const app: Application = express();
 
@@ -120,16 +121,17 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// 8. ROUTE REGISTRATION
+
+//6. ROUTE REGISTRATION (Sequential & Clean)
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/blogs', blog);
 app.use('/api/admin/blogs', adminBlogRouter);
-app.use('/api/picks', pickRoutes);
-app.use('/api/social', socialRoutes);
 app.use('/api/notifications', notificationRoutes); 
 app.use('/api/map', mapRoutes);
-
+app.use('/api/social/comment', commentRoutes); 
+app.use('/api/social', socialRoutes);
+app.use('/api/picks', pickRoutes);
 // Health Check
 app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: "🚀 PeerPicks Protocol Active" });

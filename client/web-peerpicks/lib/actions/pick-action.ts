@@ -1,6 +1,7 @@
 import { API } from "../api/endpoints";
 import axiosInstance from "../api/axios";
 
+
 /**
  * READ: Discovery Feed (Instagram-style)
  */
@@ -48,11 +49,37 @@ export const getPickDiscussion = async (pickId: string) => {
  * SOCIAL: Post a comment to a specific pick
  */
 export const postComment = async (pickId: string, description: string) => {
-  // FIXED: Using the correct API endpoint key
-  const result = await axiosInstance.post(API.PICKS.COMMENT(pickId), {
-    description,
+  // Using the CREATE endpoint from our COMMENTS object
+  const result = await axiosInstance.post(API.COMMENTS.CREATE, {
+    content: description,
+    pickId: pickId,
   });
   return result;
+};
+/**
+ * SOCIAL: Update an existing comment
+ * Allows users to edit their text signals without creating a new node.
+ */
+export const updateComment = async (commentId: string, text: string) => { // Changed param name to 'text'
+  const result = await axiosInstance.patch(API.COMMENTS.UPDATE(commentId), {
+    content: text, // Now 'text' is defined and matches the parameter
+  });
+  return result;
+};
+
+/**
+ * SOCIAL: Delete a comment [2026-02-01 Protocol]
+ * Protocol Adherence: Strictly using the term "delete" for the action name.
+ */
+export const deleteComment = async (commentId: string) => {
+  try {
+    // This hits the DELETE /api/social/comment/:id endpoint
+    const result = await axiosInstance.delete(API.COMMENTS.DELETE(commentId));
+    return result;
+  } catch (error) {
+    console.error("Failed to delete signal:", error);
+    throw error;
+  }
 };
 
 /**

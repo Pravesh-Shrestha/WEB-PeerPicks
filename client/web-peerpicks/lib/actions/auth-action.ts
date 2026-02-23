@@ -12,13 +12,15 @@ import axiosInstance from '../api/axios';
  * Shared error utility for Server Actions
  */
 const serverActionError = (error: any, context: string) => {
-    console.error(`${context} Error:`, error.message || error);
+    // If it's a redirect error, re-throw it so Next.js can handle it
+    if (error.digest?.includes('NEXT_REDIRECT')) throw error;
+    
+    console.error(`${context} Error:`, error.response?.data?.message || error.message || error);
     return { 
         success: false, 
-        message: error.message || 'An unexpected error occurred' 
+        message: error.response?.data?.message || error.message || 'An unexpected error occurred' 
     };
 };
-
 export const handleRegister = async (data: SignupData) => {
     try {
         const result = await register(data);
@@ -38,28 +40,52 @@ export const handleRegister = async (data: SignupData) => {
 };
 
 export const handleLogin = async (data: { email: string; password: string }) => {
+  let isSuccessful = false;
+  let authData = null;
+
   try {
+    // 1. DELETE PROTOCOL: Clear stale signals before fresh handshake
     await clearAuthCookies();
+
+    // 2. IDENTITY HANDSHAKE: Request session from backend
     const result = await login(data);
 
-    // If the backend returns the token directly without a 'success' boolean,
-    // we verify the presence of the token/user.
-    const token = result?.token;
-    const userData = result?.user || result?.data;
-
-    if (token && userData) {
-      await setAuthToken(token);
+    if (result?.token && (result?.user || result?.data)) {
+      const userData = result.user || result.data;
+      
+      // 3. COMMIT PERSISTENCE: Set server-side cookies
+      await setAuthToken(result.token);
       await setUserData(userData);
 
-      return { success: true, data: userData };
+      // Store data to return to the client-side context
+      authData = {
+        user: userData,
+        token: result.token
+      };
+      
+      isSuccessful = true;
+    } else {
+      return { 
+        success: false, 
+        message: result?.message || "Invalid credentials provided." 
+      };
     }
-
-    return { 
-      success: false, 
-      message: result?.message || "Invalid Signal Credentials" 
-    };
   } catch (error: any) {
-    return serverActionError(error, "Login");
+    // If it's a redirect error from Next.js, let it bubble up
+    if (error.digest?.includes('NEXT_REDIRECT')) throw error;
+    
+    console.error("LOGIN_EXECUTION_ERROR:", error.message);
+    return { success: false, message: error.message || "Login failed" };
+  }
+
+  if (isSuccessful) {
+    // 4. CACHE PURGE: Invalidate stale dashboard layouts
+    revalidatePath('/', 'layout');
+    revalidatePath('/dashboard');
+
+    // 5. RETURN SIGNAL: Send data back to AuthContext for instant UI sync
+    // We don't redirect here if we want the Client Component to handle it after loginSync
+    return { success: true, data: authData?.user, token: authData?.token };
   }
 };
 

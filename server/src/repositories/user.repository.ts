@@ -6,7 +6,7 @@ export interface IUserRepository {
   create(userData: Partial<IUser>): Promise<IUser>;
   getUserById(userId: string): Promise<IUser | null>;
   updateUser(userId: string, updateData: Partial<IUser>): Promise<IUser | null>;
-  deleteUser(userId: string): Promise<IUser | null>;
+  deleteUser(userId: string): Promise<IUser | null>; // Protocol: [2026-02-01]
   getAllUsers(): Promise<IUser[]>;
   follow(followerId: string, targetId: string): Promise<void>;
   unfollow(followerId: string, targetId: string): Promise<void>;
@@ -14,60 +14,87 @@ export interface IUserRepository {
 }
 
 export class UserRepository implements IUserRepository {
+  /**
+   * FIX: The Identity Handshake often fails due to casing.
+   * We normalize the email signal here to ensure 401s don't happen due to typos.
+   */
   async findByEmail(email: string): Promise<IUser | null> {
-    return await UserModel.findOne({ email });
-  }
+  if (!email) return null;
+  // Use a case-insensitive regex or simply lowercase the input
+  return await UserModel.findOne({ 
+    email: email.toLowerCase().trim() 
+  }).exec();
+}
 
   async create(userData: Partial<IUser>): Promise<IUser> {
+    // Ensure email is stored normalized
+    if (userData.email) userData.email = userData.email.toLowerCase().trim();
     return await new UserModel(userData).save();
   }
 
   async getUserById(userId: string): Promise<IUser | null> {
+    // Lean queries are faster for read-only operations
     return await UserModel.findById(userId).select("-password");
   }
 
   async updateUser(userId: string, updateData: Partial<IUser>): Promise<IUser | null> {
+    if (updateData.email) updateData.email = updateData.email.toLowerCase().trim();
+    
     return await UserModel.findByIdAndUpdate(userId, updateData, { 
       new: true, 
       runValidators: true 
-    });
+    }).exec();
   }
 
   /**
-   * Permanently deletes a user from the database.
+   * [2026-02-01] Delete Protocol: Permanent removal of identity.
    */
   async deleteUser(userId: string): Promise<IUser | null> {
-    return await UserModel.findByIdAndDelete(userId);
+    return await UserModel.findByIdAndDelete(userId).exec();
   }
 
   async getAllUsers(): Promise<IUser[]> {
-    return await UserModel.find().select("-password").sort({ createdAt: -1 });
+    return await UserModel.find()
+      .select("-password")
+      .sort({ createdAt: -1 })
   }
 
   /**
-   * SOCIAL: Handles both follow and unfollow logic to reduce code duplication.
-   * Uses atomic increments to keep counts in sync.
+   * SOCIAL: Uses MongoDB Transactions to ensure both sides of the 
+   * handshake are committed or rolled back together.
    */
   private async updateSocialConnection(
     followerId: string, 
     targetId: string, 
     isFollow: boolean
   ): Promise<void> {
-    const operator = isFollow ? '$addToSet' : '$pull';
-    const increment = isFollow ? 1 : -1;
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    await Promise.all([
+    try {
+      const operator = isFollow ? '$addToSet' : '$pull';
+      const increment = isFollow ? 1 : -1;
+
       // Update Follower: Modify 'following' list and count
-      UserModel.findByIdAndUpdate(followerId, {
+      const updateFollower = UserModel.findByIdAndUpdate(followerId, {
         [operator]: { following: targetId },
         $inc: { followingCount: increment }
-      }),
+      }, { session });
+
       // Update Target: Modify 'followers' list and count
-      UserModel.findByIdAndUpdate(targetId, {
+      const updateTarget = UserModel.findByIdAndUpdate(targetId, {
         [operator]: { followers: followerId },
         $inc: { followerCount: increment }
-      })
-    ]);
+      }, { session });
+
+      await Promise.all([updateFollower, updateTarget]);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   async follow(followerId: string, targetId: string): Promise<void> {
@@ -79,12 +106,11 @@ export class UserRepository implements IUserRepository {
   }
 
   async isFollowing(followerId: string, targetId: string): Promise<boolean> {
-    const user = await UserModel.findOne({ _id: followerId, following: targetId });
-    return !!user;
-  }
-
-  // Alias for findByEmail to match interface naming
-  async getUserByEmail(email: string): Promise<IUser | null> {
-    return this.findByEmail(email);
+    // Use .countDocuments for a "leaner" check than fetching the whole document
+    const count = await UserModel.countDocuments({ 
+      _id: followerId, 
+      following: targetId 
+    });
+    return count > 0;
   }
 }

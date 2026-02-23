@@ -24,7 +24,7 @@ import {
 import { useAuth } from "@/app/context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner"; // Added Sonner
+import { toast } from "sonner";
 
 interface PickCardProps {
   pick: any;
@@ -38,34 +38,35 @@ export const PickCard = ({
   pick,
   initialIsFavorited,
   onDeleteSuccess,
-  onSaveSuccess, // Destructured correctly
+  onSaveSuccess,
 }: PickCardProps) => {
   const { user: currentUser } = useAuth();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  // --- STATE ---
   const [voteStatus, setVoteStatus] = useState<"up" | null>(
     pick.hasUpvoted ? "up" : null,
   );
   const [voteCount, setVoteCount] = useState(pick.upvoteCount || 0);
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited || false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Sync favorited state if props change (useful for feed updates)
   useEffect(() => {
     if (!isPending) {
       setIsFavorited(initialIsFavorited || false);
     }
   }, [initialIsFavorited, isPending]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
+  // --- HELPERS ---
   const isAuthor =
     currentUser?.id === pick.user?._id || currentUser?._id === pick.user?._id;
   const authorName = pick.user?.fullName || pick.user?.name || "Anonymous User";
   const authorAvatar = getMediaUrl(pick.user?.profilePicture, "profilePicture");
   const mediaFiles = pick.mediaUrls || [];
-  const locationDisplay = pick.locationName || pick.placeDetails?.name || "Unknown Sector";
-  const aliasDisplay = pick.locationAlias || pick.alias || "";
 
   const nextMedia = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -79,10 +80,20 @@ export const PickCard = ({
     );
   };
 
+  // --- ACTIONS ---
   const onVoteClick = async () => {
-    setVoteStatus(voteStatus === "up" ? null : "up");
-    setVoteCount((prev: number) => (voteStatus === "up" ? prev - 1 : prev + 1));
-    await handleVote(pick._id);
+    const isUpvoted = voteStatus === "up";
+    setVoteStatus(isUpvoted ? null : "up");
+    setVoteCount((prev: number) => (isUpvoted ? prev - 1 : prev + 1));
+
+    try {
+      await handleVote(pick._id);
+    } catch (error) {
+      // Revert on failure
+      setVoteStatus(isUpvoted ? "up" : null);
+      setVoteCount((prev: number) => (isUpvoted ? prev + 1 : prev - 1));
+      toast.error("SIGNAL INTERRUPTED", { description: "VOTE FAILED TO SYNC" });
+    }
   };
 
   const onFavoriteClick = async () => {
@@ -92,25 +103,25 @@ export const PickCard = ({
       try {
         const result = await handleToggleSave(pick._id);
 
-        if (result && result.success) {
+        if (result?.success) {
+          setIsFavorited(result.isFavorited);
+
           if (result.isFavorited) {
-            setIsFavorited(true);
-
-            // Trigger global notification in FeedContent
             if (onSaveSuccess) onSaveSuccess();
-
-            // Wait 1.4s for the top notification to be read before removing card
+            // Optional: Delay removal if viewing from a specific "vault" context
             setTimeout(() => {
-              if (onDeleteSuccess) onDeleteSuccess();
+              if (
+                onDeleteSuccess &&
+                window.location.pathname.includes("vault")
+              ) {
+                onDeleteSuccess();
+              }
             }, 1400);
           } else {
-            setIsFavorited(false);
-            // Instant removal if unsaving
             if (onDeleteSuccess) onDeleteSuccess();
           }
         }
       } catch (error: any) {
-        console.error("Favorite error:", error);
         if (error.response?.status === 429) {
           toast.error("SYSTEM BUSY", { description: "TOO MANY REQUESTS" });
         }
@@ -118,9 +129,8 @@ export const PickCard = ({
     });
   };
 
-  // 2. DELETE LOGIC
   const onDeleteClick = async () => {
-    // Protocol Compliance: Terminology "Delete" [cite: 2026-02-01]
+    // Protocol Compliance: Terminology "Delete" [2026-02-01]
     const confirmed = confirm(
       "CONFIRM PROTOCOL: Delete this pick from the system?",
     );
@@ -128,15 +138,11 @@ export const PickCard = ({
     if (confirmed) {
       try {
         const result = await handleDeletePick(pick._id);
-
         if (result.success) {
           toast.success("PICK DELETED", {
             description: "DATA REMOVED FROM GLOBAL FEED",
           });
-
-          // Remove from local feed state immediately
           if (onDeleteSuccess) onDeleteSuccess();
-
           router.refresh();
         }
       } catch (error: any) {
@@ -146,6 +152,16 @@ export const PickCard = ({
       }
     }
   };
+
+  const onShareClick = () => {
+    const url = `${window.location.origin}/dashboard/picks/${pick._id}`;
+    navigator.clipboard.writeText(url);
+    toast.info("LINK COPIED", {
+      description: "SIGNAL URL SAVED TO CLIPBOARD",
+      icon: <Share2 size={14} className="text-[#D4FF33]" />,
+    });
+  };
+
   const renderMedia = (url: string, className: string, autoPlay = true) => {
     const isVideo = url.match(/\.(mp4|webm|mov)$/i);
     const fullUrl = getMediaUrl(url, "pick");
@@ -161,21 +177,7 @@ export const PickCard = ({
         />
       );
     }
-    return <img src={fullUrl} className={className} alt="Post media" />;
-  };
-  // 1. SHARE LOGIC
-  const onShareClick = () => {
-    // Generate URL based on pick ID
-    const url = `${window.location.origin}/picks/${pick._id}`;
-
-    // Copy to clipboard
-    navigator.clipboard.writeText(url);
-
-    // Design Protocol Toast
-    toast.info("LINK COPIED", {
-      description: "SIGNAL URL SAVED TO CLIPBOARD",
-      icon: <Share2 size={14} className="text-[#D4FF33]" />,
-    });
+    return <img src={fullUrl} className={className} alt="Pick content" />;
   };
 
   return (
@@ -189,17 +191,14 @@ export const PickCard = ({
                 <img
                   src={authorAvatar}
                   className="w-full h-full object-cover"
-                  alt=""
+                  alt={authorName}
                 />
               </div>
               <div>
                 <h4 className="text-lg font-bold text-white">{authorName}</h4>
                 <Link
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    pick.locationName ||
-                      pick.placeDetails?.name ||
-                      pick.alias ||
-                      "",
+                    pick.locationName || pick.placeDetails?.name || "",
                   )}`}
                   target="_blank"
                   className="flex items-center gap-2 mt-1 text-zinc-500 hover:text-[#D4FF33] transition-colors group"
@@ -208,10 +207,7 @@ export const PickCard = ({
                   <span className="text-xs font-bold uppercase tracking-widest">
                     {pick.locationName ||
                       pick.placeDetails?.name ||
-                      (typeof pick.place === "string" ? pick.place : "") ||
-                      "Location:"}
-
-                    {/* Display Alias if it exists and is different from the name */}
+                      "Unknown Sector"}
                     {pick.alias && pick.alias !== pick.locationName && (
                       <span className="ml-1 text-[#D4FF33]/70">
                         ({pick.alias})
@@ -223,7 +219,6 @@ export const PickCard = ({
             </div>
 
             <div className="flex items-center gap-4">
-              {/* DELETE BUTTON - Protocol: Terminology "Delete" [2026-02-01] */}
               {isAuthor && (
                 <button
                   onClick={onDeleteClick}
@@ -233,7 +228,6 @@ export const PickCard = ({
                   Delete
                 </button>
               )}
-
               <div className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-2">
                 <Star size={18} className="fill-[#D4FF33] text-[#D4FF33]" />
                 <span className="text-lg font-black text-white">
@@ -285,7 +279,7 @@ export const PickCard = ({
             </div>
           </div>
 
-          {/* BOTTOM CONTENT */}
+          {/* CONTENT & ACTIONS */}
           <div className="p-12">
             <p className="text-zinc-300 text-xl font-medium leading-relaxed mb-12">
               {pick.description}
@@ -305,7 +299,6 @@ export const PickCard = ({
               </button>
 
               <div className="flex gap-10">
-                {/* SAVE BUTTON */}
                 <button
                   onClick={onFavoriteClick}
                   disabled={isPending}
@@ -316,11 +309,7 @@ export const PickCard = ({
                   >
                     <Heart
                       size={28}
-                      className={
-                        isFavorited
-                          ? "fill-pink-500 text-pink-500"
-                          : "text-zinc-500"
-                      }
+                      className={isFavorited ? "fill-pink-500" : ""}
                     />
                   </div>
                   <span className="text-xs font-bold uppercase">
@@ -328,8 +317,10 @@ export const PickCard = ({
                   </span>
                 </button>
 
-                {/* COMMENTS BUTTON */}
-                <button className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90">
+                <button
+                  onClick={() => router.push(`/dashboard/picks/${pick._id}`)}
+                  className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90"
+                >
                   <div className="p-5 rounded-3xl bg-white/5 border border-white/10 hover:border-white/30 transition-all">
                     <MessageCircle size={28} />
                   </div>
@@ -338,7 +329,6 @@ export const PickCard = ({
                   </span>
                 </button>
 
-                {/* SHARE BUTTON - Integrated with Clipboard + Sonner */}
                 <button
                   onClick={onShareClick}
                   className="flex flex-col items-center gap-2 text-zinc-500 hover:text-white transition-all active:scale-90"
@@ -365,7 +355,7 @@ export const PickCard = ({
           >
             <button
               onClick={() => setIsFullscreen(false)}
-              className="absolute top-10 right-10 text-white p-4 bg-white/10 rounded-full z-[1000] hover:bg-white hover:text-black transition-all"
+              className="absolute top-10 right-10 text-white p-4 bg-white/10 rounded-full z-[1000] hover:bg-white hover:text-black"
             >
               <X size={32} />
             </button>

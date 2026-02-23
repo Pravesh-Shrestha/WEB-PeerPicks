@@ -4,6 +4,7 @@ import { socialRepository } from "../repositories/social.repository";
 import { UserRepository } from "../repositories/user.repository"; // Added to check follow status
 import { HttpError } from "../errors/http-error";
 import { Types } from "mongoose";
+import { notificationRepository } from "repositories/notification.repository";
 
 const userRepo = new UserRepository();
 
@@ -13,31 +14,35 @@ const hydratePicks = async (picks: any | any[], currentUserId?: string) => {
   const isArray = Array.isArray(picks);
   const picksList = isArray ? picks : [picks];
 
-  const currentUser = currentUserId ? await userRepo.getUserById(currentUserId) : null;
+  const currentUser = currentUserId
+    ? await userRepo.getUserById(currentUserId)
+    : null;
 
-  const hydrated = await Promise.all(picksList.map(async (pick) => {
-    const pickObj = pick.toObject ? pick.toObject() : pick;
+  const hydrated = await Promise.all(
+    picksList.map(async (pick) => {
+      const pickObj = pick.toObject ? pick.toObject() : pick;
 
-    // --- IDENTITY RESOLUTION ---
-    let userData = pickObj.user;
-    // If user is just an ID, fetch the full node so the name appears
-    if (typeof userData === 'string' || userData instanceof Types.ObjectId) {
-      userData = await userRepo.getUserById(userData.toString());
-    }
+      // --- IDENTITY RESOLUTION ---
+      let userData = pickObj.user;
+      // If user is just an ID, fetch the full node so the name appears
+      if (typeof userData === "string" || userData instanceof Types.ObjectId) {
+        userData = await userRepo.getUserById(userData.toString());
+      }
 
-    const hasUpvoted = currentUserId
-      ? pickObj.upvotes?.some((id: any) => id.toString() === currentUserId)
-      : false;
+      const hasUpvoted = currentUserId
+        ? pickObj.upvotes?.some((id: any) => id.toString() === currentUserId)
+        : false;
 
-    return {
-      ...pickObj,
-      user: userData, // Name and Profile Picture are now guaranteed
-      hasUpvoted,
-      // Metadata mapping
-      locationName: pickObj.placeDetails?.name || "Unknown Sector",
-      stars: pickObj.stars || 0
-    };
-  }));
+      return {
+        ...pickObj,
+        user: userData, // Name and Profile Picture are now guaranteed
+        hasUpvoted,
+        // Metadata mapping
+        locationName: pickObj.placeDetails?.name || "Unknown Sector",
+        stars: pickObj.stars || 0,
+      };
+    }),
+  );
 
   return isArray ? hydrated : hydrated[0];
 };

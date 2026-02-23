@@ -6,19 +6,21 @@ export const favoriteRepository = {
    * TOGGLE SAVE: Adds to vault if missing, removes if present.
    */
   toggleSave: async (userId: string, pickId: string) => {
-    const existing = await Favorite.findOne({
-      user: new Types.ObjectId(userId),
-      pick: new Types.ObjectId(pickId),
+    const userOID = new Types.ObjectId(userId);
+    const pickOID = new Types.ObjectId(pickId);
+
+    const existing = await Favorite.findOneAndDelete({
+      user: userOID,
+      pick: pickOID,
     });
 
     if (existing) {
-      await Favorite.findByIdAndDelete(existing._id);
       return { isSaved: false, message: "Removed from vault." };
     }
 
     await Favorite.create({
-      user: new Types.ObjectId(userId),
-      pick: new Types.ObjectId(pickId),
+      user: userOID,
+      pick: pickOID,
     });
 
     return { isSaved: true, message: "Saved to vault." };

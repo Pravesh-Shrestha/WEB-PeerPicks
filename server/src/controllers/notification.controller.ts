@@ -41,9 +41,15 @@ export const notificationController = {
     });
   },
 
-  // Helper method for other services to "Push" to the UI
   broadcastToUser: (userId: string, payload: any) => {
     const targets = sseClients.filter(c => c.userId === userId);
+    
+    if (targets.length === 0) {
+      console.log(`[SSE] No active stream for user ${userId}. Signal saved to DB only.`);
+      return;
+    }
+
+    console.log(`[SSE] Dispatching ${payload.type} to user ${userId}`);
     targets.forEach(c => c.res.write(`data: ${JSON.stringify(payload)}\n\n`));
   },
 

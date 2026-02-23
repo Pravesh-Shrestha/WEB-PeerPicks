@@ -1,58 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthToken, getUserData } from "./lib/cookie";
 
-const publicPaths = ["/login", "/signup", "/register", "/forget-password"];
-const authRestrictedPaths = ["/admin", "/user", "/dashboard", "/picks", "/update-profile"];
+// Define restricted paths as specific prefixes
+const PUBLIC_PATHS = ["/login", "/signup", "/register", "/forget-password"];
+const PROTECTED_PATHS = ["/admin", "/user", "/dashboard", "/picks", "/update-profile"];
 
 export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl;
-    
-    // 1. Get Token from cookies
+
+    // 1. IDENTITY HANDSHAKE: Retrieve credentials from the cookie store
     const token = await getAuthToken();
-    
-    // Check if current path is public or protected
-    const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
-    const isProtectedRoute = authRestrictedPaths.some((path) => pathname.startsWith(path));
-
-    // 2. Early Exit: If no token and it's a public path, just proceed. 
-    // This saves us from trying to fetch 'getUserData' for guest users.
-    if (!token && isPublicPath) {
-        return NextResponse.next();
-    }
-
-    // 3. Fetch user data (The "Node" Identity)
     let user = null;
+
     if (token) {
         try {
             user = await getUserData();
         } catch (e) {
-            // Data is stale or node signature is invalid
+            console.error("Middleware Identity Sync Error:", e);
+            // If data is corrupted, we treat the session as invalid
             user = null;
         }
     }
 
-    // LOGIC: Block unauthenticated users from secure nodes
-    if ((!token || !user) && isProtectedRoute) {
-        const loginUrl = new URL("/login", req.url);
-        loginUrl.searchParams.set("from", pathname);
-        return NextResponse.redirect(loginUrl);
-    }
+    // Determine the nature of the current path
+    const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+    const isProtectedRoute = PROTECTED_PATHS.some((path) => pathname.startsWith(path));
 
-    // LOGIC: Redirect authenticated users away from Login/Signup
+    // 2. LOGIC: Authenticated users should not see auth pages
+    // If they have a token AND user data, redirect them based on their role
     if (token && user && isPublicPath) {
         const target = user.role === 'admin' ? "/admin" : "/dashboard";
         return NextResponse.redirect(new URL(target, req.url));
     }
 
-    // RBAC: Role-Based Access Control
+    // 3. LOGIC: Unauthenticated users blocked from protected routes
+    // Note: If token exists but user data is missing (sync failure), we force a re-login
+    if ((!token || !user) && isProtectedRoute) {
+        const loginUrl = new URL("/login", req.url);
+        // Add callback URL so they return here after successful login
+        loginUrl.searchParams.set("from", pathname);
+        return NextResponse.redirect(loginUrl);
+    }
+
+    // 4. RBAC: Role-Based Access Control
     if (user) {
-        // Strict Admin Gate
+        // [2026-02-01] Guard rails for Admin-only zones
         if (pathname.startsWith("/admin") && user.role !== 'admin') {
             return NextResponse.redirect(new URL("/dashboard", req.url));
         }
         
-        // Standard User Gate
-        if (pathname.startsWith("/user") && !['user', 'admin'].includes(user.role)) {
+        // Guard rails for standard user zones
+        const allowedRoles = ['user', 'admin'];
+        if (pathname.startsWith("/user") && !allowedRoles.includes(user.role)) {
             return NextResponse.redirect(new URL("/dashboard", req.url));
         }
     }
@@ -60,16 +59,18 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
 }
 
+/**
+ * OPTIMIZATION: Config Matcher
+ * Only run the middleware on relevant paths to maximize performance.
+ */
 export const config = {
     matcher: [
-        "/dashboard/:path*",
-        "/admin/:path*",
-        "/user/:path*",
-        "/update-profile/:path*",
-        "/picks/:path*",
-        "/login",
-        "/signup",
-        "/register",
-        "/forget-password",
-    ]
+        /*
+         * Match all paths except for:
+         * 1. /api routes
+         * 2. /_next (Next.js internals)
+         * 3. /static (static files like images)
+         */
+        '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    ],
 };

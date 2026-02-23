@@ -13,26 +13,27 @@ const userRepository = new UserRepository();
 
 export class AuthService {
   async register(data: SignupDTO) {
-    const existingUser = await userRepository.findByEmail(data.email);
-    if (existingUser) throw new Error("User already exists");
+  // Normalize the email before checking and saving
+  const normalizedEmail = data.email.toLowerCase().trim();
+  const existingUser = await userRepository.findByEmail(normalizedEmail);
+  
+  if (existingUser) throw new HttpError(409, "User already exists");
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+  const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    // VETERAN MOVE: Use destructuring to ensure unwanted fields (like confirmPassword)
-    // are stripped before saving to the database.
-    const { password, ...safeData } = data;
+  const { password, ...safeData } = data;
+  const userDataToCreate = {
+    ...safeData,
+    email: normalizedEmail, // Save normalized
+    password: hashedPassword,
+    profilePicture: data.profilePicture || undefined,
+  };
 
-    const userDataToCreate = {
-      ...safeData,
-      password: hashedPassword,
-      // Ensure profilePicture is either a string or undefined
-      profilePicture: data.profilePicture || undefined,
-    };
-
-    return await userRepository.create(userDataToCreate);
-  }
+  return await userRepository.create(userDataToCreate);
+}
   async login(data: LoginDTO) {
-    const user = await userRepository.findByEmail(data.email);
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const user = await userRepository.findByEmail(normalizedEmail);
 
     if (!user || !(await bcrypt.compare(data.password, user.password))) {
       throw new Error("Invalid credentials");
@@ -124,7 +125,7 @@ export class AuthService {
     if (!email) {
       throw new HttpError(400, "Email is required");
     }
-    const user = await userRepository.getUserByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       throw new HttpError(404, "User not found");
     }

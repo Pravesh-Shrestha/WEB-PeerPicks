@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import axiosInstance from "@/lib/api/axios";
 import { API } from "@/lib/api/endpoints";
+import { useAuth } from "./AuthContext"; // Import Auth dependency
 
 interface DashboardContextType {
   refreshTicket: number;
@@ -16,9 +17,9 @@ interface DashboardContextType {
   triggerRefresh: () => void;
   setUnreadCount: React.Dispatch<React.SetStateAction<number>>;
   fetchUnreadCount: () => Promise<void>;
-  // Protocol Compliance: "delete" [2026-02-01]
   handleDeleteSignal: (id: string, isUnread?: boolean) => Promise<void>;
   markAsRead: () => Promise<void>;
+  resetDashboard: () => void; // Added for Protocol Compliance
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(
@@ -26,6 +27,7 @@ const DashboardContext = createContext<DashboardContextType | undefined>(
 );
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth(); // Monitor auth state
   const [refreshTicket, setRefreshTicket] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -33,29 +35,27 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setRefreshTicket((prev) => prev + 1);
   }, []);
 
-  /**
-   * FIX: Axios interceptor already unwraps .data
-   * We access 'res.count' directly.
-   */
- const fetchUnreadCount = useCallback(async () => {
-    try {
-      // res is unwrapped: { success: true, count: X }
-      const res: any = await axiosInstance.get(API.NOTIFICATIONS.UNREAD_COUNT);
+  const resetDashboard = useCallback(() => {
+    setUnreadCount(0);
+    setRefreshTicket(0);
+  }, []);
 
+  const fetchUnreadCount = useCallback(async () => {
+    // Only fetch if we have an active identity handshake
+    if (!isAuthenticated) return;
+
+    try {
+      const res: any = await axiosInstance.get(API.NOTIFICATIONS.UNREAD_COUNT);
       if (res && typeof res.count === "number") {
         setUnreadCount(res.count);
       }
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        setUnreadCount(0); // Graceful reset on auth failure
-      }
-      console.error("[SIGNAL_SYNC_ERROR]: Node handshake failed.");
+      console.error("[SIGNAL_SYNC_ERROR]: Dashboard handshake failed.");
     }
-  }, []);
+  }, [isAuthenticated]);
 
   /**
    * PROTOCOL COMPLIANT: Delete logic [2026-02-01]
-   * Added optimistic decrement for better UX.
    */
   const handleDeleteSignal = async (id: string, isUnread: boolean = false) => {
     // 1. Optimistic Update
@@ -64,29 +64,32 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     try {
       await axiosInstance.delete(API.NOTIFICATIONS.DELETE(id));
       console.log(`[PROTOCOL_ACTION]: Signal ${id} deleted.`);
-
       triggerRefresh();
     } catch (error) {
       console.error("DELETE_PROTOCOL_FAILURE:", error);
-      // Rollback if critical, though usually we just re-sync
-      fetchUnreadCount();
+      fetchUnreadCount(); // Sync back on failure
     }
   };
 
-const markAsRead = async () => {
-  try {
-    await axiosInstance.patch(API.NOTIFICATIONS.MARK_READ);
-    setUnreadCount(0);
-    triggerRefresh(); // Kick the ticket to update the feed page
-    console.log("[PROTOCOL_SYNC]: All signals marked as read.");
-  } catch (error) {
-    console.error("SYNC_FAILURE:", error);
-  }
-};
-  // Initial Sync
+  const markAsRead = async () => {
+    try {
+      await axiosInstance.patch(API.NOTIFICATIONS.MARK_READ);
+      setUnreadCount(0);
+      triggerRefresh();
+      console.log("[PROTOCOL_SYNC]: All signals marked as read.");
+    } catch (error) {
+      console.error("SYNC_FAILURE:", error);
+    }
+  };
+
+  // Auto-sync when authentication state changes or refresh is triggered
   useEffect(() => {
-    fetchUnreadCount();
-  }, [fetchUnreadCount]);
+    if (isAuthenticated) {
+      fetchUnreadCount();
+    } else {
+      resetDashboard();
+    }
+  }, [isAuthenticated, fetchUnreadCount, refreshTicket, resetDashboard]);
 
   return (
     <DashboardContext.Provider
@@ -97,8 +100,8 @@ const markAsRead = async () => {
         fetchUnreadCount,
         triggerRefresh,
         handleDeleteSignal,
-        markAsRead
-
+        markAsRead,
+        resetDashboard
       }}
     >
       {children}

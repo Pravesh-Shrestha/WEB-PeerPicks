@@ -24,7 +24,6 @@ export const API = {
 
     // Discussion & Social Interaction
     DISCUSSION: (id: string) => `/api/picks/${id}/discussion`,
-    COMMENT: (id: string) => `/api/social/comment/${id}`,
     VOTE: (id: string) => `/api/social/vote/${id}`,
 
     // Favorites
@@ -54,13 +53,22 @@ export const API = {
   NOTIFICATIONS: {
     BASE: "/api/notifications",
     STREAM: "/api/notifications/stream", // The SSE Bridge
-    GET_ALL: "/api/notifications",       // To fetch the full signal feed
+    GET_ALL: "/api/notifications", // To fetch the full signal feed
     UNREAD_COUNT: "/api/notifications/unread-count",
-    MARK_READ: "/api/notifications/read", 
-    DELETE: (id: string) => `/api/notifications/${id}`, 
+    MARK_READ: "/api/notifications/read",
+    DELETE: (id: string) => `/api/notifications/${id}`,
   },
 
   MAP: {
     NEARBY: "/api/map/nearby",
+  },
+
+  // ADD THIS SECTION: Dedicated for reading/writing comments
+  COMMENTS: {
+    CREATE: "/api/social/comment",
+    // FIX: Match the backend 'discussion' route instead of /social/comments/
+    GET_BY_PICK: (id: string) => `/api/picks/${id}/discussion`,
+    UPDATE: (id: string) => `/api/social/comment/${id}`,
+    DELETE: (id: string) => `/api/social/comment/${id}`,
   },
 };
