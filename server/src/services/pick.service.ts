@@ -1,24 +1,22 @@
 import { pickRepository } from "../repositories/pick.repository";
 import { placeRepository } from "../repositories/place.repository";
 import { socialRepository } from "../repositories/social.repository";
-import { UserRepository } from "../repositories/user.repository"; // Added to check follow status
+import { UserRepository } from "../repositories/user.repository";
 import { HttpError } from "../errors/http-error";
 import { Types } from "mongoose";
-import { notificationRepository } from "repositories/notification.repository";
 import { CommentRepository } from "../repositories/comment.repository";
+import { notificationService } from "../services/notification.service"; // Delegation to Service
 
 const userRepo = new UserRepository();
 const commentRepo = new CommentRepository();
 
-// pick.service.ts
-
+/**
+ * IDENTITY RESOLUTION:
+ * Ensures every pick carries its user node metadata and interaction status.
+ */
 const hydratePicks = async (picks: any | any[], currentUserId?: string) => {
   const isArray = Array.isArray(picks);
   const picksList = isArray ? picks : [picks];
-
-  const currentUser = currentUserId
-    ? await userRepo.getUserById(currentUserId)
-    : null;
 
   const hydrated = await Promise.all(
     picksList.map(async (pick) => {
@@ -26,7 +24,6 @@ const hydratePicks = async (picks: any | any[], currentUserId?: string) => {
 
       // --- IDENTITY RESOLUTION ---
       let userData = pickObj.user;
-      // If user is just an ID, fetch the full node so the name appears
       if (typeof userData === "string" || userData instanceof Types.ObjectId) {
         userData = await userRepo.getUserById(userData.toString());
       }
@@ -37,9 +34,8 @@ const hydratePicks = async (picks: any | any[], currentUserId?: string) => {
 
       return {
         ...pickObj,
-        user: userData, // Name and Profile Picture are now guaranteed
+        user: userData,
         hasUpvoted,
-        // Metadata mapping
         locationName: pickObj.placeDetails?.name || "Unknown Sector",
         stars: pickObj.stars || 0,
       };
@@ -48,18 +44,19 @@ const hydratePicks = async (picks: any | any[], currentUserId?: string) => {
 
   return isArray ? hydrated : hydrated[0];
 };
+
 export const pickService = {
   /**
    * CREATE: Synchronizes the Place Hub and saves the User Review or Comment.
+   * Includes automated notification dispatch via SSE.
    */
   async createNewPick(userId: string, placeData: any, reviewData: any) {
     // 1. Sync the Place Hub
     const place = await placeRepository.upsertPlace({
-      placeId: placeData.name, // Ensure this matches your link/id logic
+      placeId: placeData.name,
       name: placeData.name,
       category: placeData.category,
       address: placeData.name,
-      // FIX: Pass actual coordinates to the place hub too
       location: {
         type: "Point",
         coordinates: [placeData.lng, placeData.lat],
@@ -68,10 +65,10 @@ export const pickService = {
 
     if (!place) throw new HttpError(500, "Failed to synchronize location hub.");
 
-    // 2. Create the Pick with the REQUIRED location field
+    // 2. Create the Pick (Resolves coordinate & place requirements)
     const pick = await pickRepository.create({
       user: new Types.ObjectId(userId),
-      place: place._id, // Matches 'place' required path in error
+      place: place._id,
       alias: placeData.alias,
       parentPick: reviewData.parentPickId
         ? new Types.ObjectId(reviewData.parentPickId)
@@ -81,15 +78,35 @@ export const pickService = {
       description: reviewData.description,
       mediaUrls: reviewData.mediaUrls || [],
       tags: reviewData.tags || [],
-      // FIX: This solves the "location.coordinates is required" error
       location: {
         type: "Point",
         coordinates: [placeData.lng, placeData.lat],
       },
     });
 
+    // 3. Increment counters if this is a reply (signal)
     if (reviewData.parentPickId) {
       await socialRepository.incrementCommentCount(reviewData.parentPickId);
+
+      const parentPick = await pickRepository.findById(reviewData.parentPickId);
+
+      // --- NOTIFICATION DISPATCH (VETERAN MOVE) ---
+      // We delegate to the notificationService to handle DB persistence,
+      // self-notification guards, and real-time SSE broadcasting.
+      if (parentPick) {
+        const parentOwnerId = parentPick.user.toString();
+        const currentUserId = userId.toString();
+        if (parentOwnerId !== currentUserId) {
+          await notificationService.createNotification({
+            recipient: parentPick.user,
+            actor: userId.toString(),
+            type: "COMMENT",
+            pickId: parentPick._id,
+            message: "broadcasted a new signal on your pick.",
+            status: "info",
+          });
+        }
+      }
     }
 
     return pick;
@@ -98,17 +115,11 @@ export const pickService = {
   /**
    * READ: Fetches the discussion thread (replies) for a specific Pick.
    */
-
   async getDiscussion(pickId: string, currentUserId?: string) {
-    // 1. Fetch the parent pick details to satisfy the frontend loader
     const parent = await pickRepository.findById(pickId);
     if (!parent) throw new Error("PICK_NOT_FOUND");
 
-    // 2. Hydrate parent with user details and upvote status
     const hydratedParent = await hydratePicks(parent, currentUserId);
-
-    // 3. Fetch signals via the Repository instance
-    // The Repository's findByPickId already populates 'author'
     const signals = await commentRepo.findByPickId(pickId);
 
     return {
@@ -117,6 +128,7 @@ export const pickService = {
       commentCount: signals.length,
     };
   },
+
   /**
    * READ: Discovery Feed with interaction status
    */
@@ -136,7 +148,7 @@ export const pickService = {
   },
 
   /**
-   * READ: Place Hub profile (Meta-data + all user reviews for this link)
+   * READ: Place Hub profile
    */
   async getPlaceHubDetails(linkId: string, currentUserId?: string) {
     const place = await placeRepository.findByLinkId(linkId);
@@ -156,28 +168,24 @@ export const pickService = {
    */
   async updateUserPick(pickId: string, userId: string, updateData: any) {
     const updatedPick = await pickRepository.update(pickId, userId, updateData);
-    if (!updatedPick) {
-      throw new HttpError(403, "Update failed. Unauthorized.");
-    }
+    if (!updatedPick) throw new HttpError(403, "Update failed. Unauthorized.");
     return updatedPick;
   },
 
   /**
-   * DELETE: owner-only removal, syncing commentCount if it's a comment.
+   * DELETE: owner-only removal [2026-02-01]
+   * Changed terminology to 'delete' per project constraints.
    */
   async deleteUserPick(pickId: string, userId: string) {
     const pick = await pickRepository.findById(pickId);
     if (!pick) throw new HttpError(404, "Pick not found.");
 
-    // Decrement parent's count if deleting a comment
     if (pick.parentPick) {
       await socialRepository.decrementCommentCount(pick.parentPick.toString());
     }
 
     const deleted = await pickRepository.delete(pickId, userId);
-    if (!deleted) {
-      throw new HttpError(403, "Delete failed. Unauthorized.");
-    }
+    if (!deleted) throw new HttpError(403, "Delete failed. Unauthorized.");
     return true;
   },
 
@@ -195,21 +203,18 @@ export const pickService = {
   async getAllPicks() {
     return await pickRepository.findAllPicks();
   },
+
   async getPicksByUser(userId: string, currentUserId?: string) {
-    // 1. Fetch User Metadata from the repository
     const user = await userRepo.getUserById(userId);
     if (!user) throw new HttpError(404, "User node not found.");
 
-    // 2. Fetch the actual picks (posts)
     const picks = await pickRepository.findByUser(userId);
     const hydratedPicks = await hydratePicks(picks, currentUserId);
 
-    // 3. Determine if the current viewer is following this specific profile
     const isFollowing = currentUserId
       ? await userRepo.isFollowing(currentUserId, userId)
       : false;
 
-    // 4. Return unified structure to satisfy the frontend state
     return {
       profile: {
         ...user.toObject(),

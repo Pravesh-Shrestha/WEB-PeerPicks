@@ -12,7 +12,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useRouter } from "next/navigation"; // Fixed: Use navigation for App Router
+import { useRouter } from "next/navigation"; 
 
 const SignalIcon = ({ type }: { type: string }) => {
   const iconSize = 16;
@@ -38,23 +38,27 @@ export const NotificationItem = ({
   const isSpecial = n.type === "WELCOME" || n.type === "SYSTEM";
 
   const handleSignalClick = () => {
-    // Navigate to the dynamic pick detail page
+    // Navigate using 'pickId' which aligns with your Repository populate
     if (n.pickId) {
-      router.push(`/dashboard/picks/${n.pickId}`);
+      router.push(`/dashboard/picks/${n.pickId._id || n.pickId}`);
     }
   };
 
   const getActorLabel = () => {
     if (n.type === "SYSTEM") return "SYSTEM_NODE";
     if (n.type === "WELCOME") return "PEERPICKS_TEAM";
+    // Uses the 'actorName' provided by your repository's fallback logic
     return n.actor?.fullName || n.actorName || "UNKNOWN_PEER";
   };
 
   const getContent = () => {
+    // Priority 1: Use the 'message' field from the DB
     if (n.message && n.message !== "null") return n.message;
+    
+    // Priority 2: Use UI-side fallback mapping
     switch (n.type) {
       case "VOTE": return "upvoted your pick.";
-      case "COMMENT": return "replied to your review.";
+      case "COMMENT": return "broadcasted a new signal on your pick.";
       case "FOLLOW": return "started following you.";
       case "SAVE": return "favorited your pick.";
       case "WELCOME": return "Welcome to the node. Signal active.";

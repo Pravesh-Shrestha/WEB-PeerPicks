@@ -1,5 +1,7 @@
 import { notificationController } from '../controllers/notification.controller';
 import { notificationRepository } from '../repositories/notification.repository';
+import { Types } from 'mongoose';
+import { INotification, IPopulatedActor } from '../models/notification.model';
 
 export const notificationService = {
   /**
@@ -15,47 +17,42 @@ export const notificationService = {
       return null;
     }
 
-    // 2. Build uniqueness query to prevent signal spam (Upsert logic)
-    // For social types (VOTE, COMMENT, SAVE), we group by actor and pickId.
-    // For WELCOME, it's unique to the recipient.
+    // 2. Build uniqueness query for upsertion
+    // Casting to Types.ObjectId ensures schema compatibility
     const query: any = {
-      recipient: recipientId,
+      recipient: new Types.ObjectId(recipientId),
       type: data.type,
-      actor: actorId,
-      pickId: data.pickId,
+      pickId: data.pickId ? new Types.ObjectId(data.pickId) : undefined,
     };
 
-    if (actorId) query.actor = actorId;
-    if (data.pickId) query.pickId = data.pickId;
-    
-    // For System/Welcome, include the message in the uniqueness check if provided
-    if (['SYSTEM', 'WELCOME'].includes(data.type) && data.message) {
-      query.message = data.message;
+    if (data.type !== 'COMMENT') {
+    query.actor = new Types.ObjectId(actorId);
+    } else {
+      query._id = new Types.ObjectId(); // Forces a new record every time for comments
     }
 
     // 3. Persist to Database via Repository
-    // We pass the specific message requested or generate the fallback
     const finalData = {
       ...data,
-      message: data.message || this.generateFallbackMessage(data.type)
+      recipient: new Types.ObjectId(recipientId),
+      actor: actorId ? new Types.ObjectId(actorId) : undefined,
+      pickId: data.pickId ? new Types.ObjectId(data.pickId) : undefined,
+      message: data.message || this.generateFallbackMessage(data.type),
+      status: data.status || this.getStatusMap(data.type)
     };
 
+    // Repository populates 'actor' internally
     const notification = await notificationRepository.upsertSocialNotification(query, finalData);
 
     // 4. SSE REAL-TIME BROADCAST
-    if (notification) {
-      const statusMap: Record<string, string> = {
-        VOTE: 'success',
-        COMMENT: 'info',
-        SAVE: 'warning',
-        WELCOME: 'success',
-        SYSTEM: 'info'
-      };
-
+    if (notification && recipientId) {
+      // FIX: Explicitly cast actor to IPopulatedActor to resolve TypeScript errors
+      const actor = notification.actor as unknown as IPopulatedActor;
+      
       const broadcastPayload = {
         ...notification,
-        status: data.status || statusMap[data.type] || 'info',
-        // Ensure the broadcast carries the same standardized message
+        // Reporting: Ensure the author's name is extracted from the populated object
+        actorName: actor?.fullName || (notification as any).actorName || "A Peer",
         message: notification.message || finalData.message
       };
 
@@ -68,13 +65,27 @@ export const notificationService = {
   },
 
   /**
+   * Maps notification types to UI status colors
+   */
+  getStatusMap(type: string): string {
+    const maps: Record<string, string> = {
+      VOTE: 'success',
+      COMMENT: 'info',
+      SAVE: 'warning',
+      WELCOME: 'success',
+      SYSTEM: 'info'
+    };
+    return maps[type] || 'info';
+  },
+
+  /**
    * Helper: Standardizes strings as per [2026-02-01] requirements.
    */
   generateFallbackMessage(type: string) {
     switch (type) {
       case 'VOTE': return 'upvoted your pick.';
-      case 'COMMENT': return 'commented on your pick.';
-      case 'SAVE': return 'save your pick.';
+      case 'COMMENT': return 'broadcasted a new signal on your pick.'; // Updated term
+      case 'SAVE': return 'saved your pick.';
       case 'FOLLOW': return 'started following you.';
       case 'WELCOME': return 'Welcome to PeerPicks! Your node is active.';
       default: return 'New signal received.';
@@ -91,6 +102,7 @@ export const notificationService = {
 
   /**
    * PROTOCOL COMPLIANT: Delete Signal [2026-02-01]
+   * Explicitly uses "delete" terminology as per project constraints.
    */
   async deleteSignal(id: string, userId: string) {
     return await notificationRepository.deleteById(id, userId);

@@ -16,12 +16,14 @@ export default function NotificationsPage() {
   useEffect(() => {
     const fetchSignals = async () => {
       try {
+        setLoading(true);
+        // Syncing with the repository findByUserId logic
         const res: any = await axiosInstance.get(API.NOTIFICATIONS.GET_ALL);
         if (res.success) {
           setSignals(res.data);
         }
       } catch (err) {
-        console.error("FEED_SYNC_FAILURE");
+        console.error("FEED_SYNC_FAILURE // CONNECTION_LOST");
       } finally {
         setLoading(false);
       }
@@ -30,8 +32,12 @@ export default function NotificationsPage() {
   }, [refreshTicket]);
 
   const onMarkAllRead = async () => {
-    await markAsRead();
-    triggerRefresh();
+    try {
+      await markAsRead();
+      triggerRefresh(); // Refresh the local ticket to re-fetch signals
+    } catch (err) {
+      console.error("SYNC_CLEAR_FAILURE");
+    }
   };
 
   if (loading) return (
@@ -48,7 +54,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="w-full py-12 px-8 lg:px-12 space-y-10">
-      {/* Header Protocol - Left Aligned */}
+      {/* Header Protocol - Signal Feed ID */}
       <div className="flex flex-col gap-6 border-b border-white/5 pb-10">
         <div className="flex items-center justify-between w-full">
           <div className="space-y-1">
@@ -64,7 +70,7 @@ export default function NotificationsPage() {
               </h1>
             </div>
             <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] pl-10">
-              Encrypted Data Inbound / {signals.length} Active Nodes
+              Encrypted Data Inbound // {signals.length} Active Nodes
             </p>
           </div>
 
@@ -80,7 +86,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* Main Signal List - Left Aligned */}
+      {/* Main Signal List - Timeline Architecture */}
       <div className="relative">
         {/* Decorative Vertical Timeline Line */}
         <div className="absolute left-[13px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D4FF33]/30 via-white/5 to-transparent" />
@@ -122,7 +128,11 @@ export default function NotificationsPage() {
                   <div className="max-w-3xl">
                     <NotificationItem 
                       n={signal} 
-                      onDelete={handleDeleteSignal} 
+                      onDelete={(id, isUnread) => {
+                        // Protocol [2026-02-01]: Using delete-specific terminology
+                        handleDeleteSignal(id, isUnread);
+                        triggerRefresh();
+                      }} 
                     />
                   </div>
                 </motion.div>
@@ -132,12 +142,12 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* Footer Info - Left Aligned */}
+      {/* Footer Info Protocol */}
       {signals.length > 0 && (
         <div className="pt-10 pl-10">
           <p className="text-[8px] font-mono text-zinc-700 uppercase tracking-[0.5em] flex items-center gap-4">
             <span className="w-8 h-[1px] bg-zinc-800" />
-            End of Signal Stream // Protocol Active
+            End of Signal Stream // Protocol Active [2026-02-01]
           </p>
         </div>
       )}

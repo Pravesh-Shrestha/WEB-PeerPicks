@@ -95,12 +95,11 @@ export default function PickDetailsPage() {
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = newComment.trim();
-    // Using 'isAuthenticated' is great, but ensure 'user' data is also present
-    if (!content || submitting || !user) return;
+    if (!content || submitting || !user || !pick) return;
 
     const tempId = `temp-${Date.now()}`;
 
-    // Protocol Sync: Map to 'author' to match Repository & Schema
+    // 1. Optimistic UI Prep
     const optimisticComment = {
       _id: tempId,
       content: content,
@@ -117,23 +116,34 @@ export default function PickDetailsPage() {
       setSubmitting(true);
       setNewComment("");
 
-      // 1. Optimistic Dispatch: Immediate UI update
+      // Update UI immediately
       setComments((prev) => [optimisticComment, ...prev]);
       setPick((prev: any) => ({
         ...prev,
         commentCount: (prev?.commentCount || 0) + 1,
       }));
 
-      // 2. Transmission
-      const res: any = await postComment(id, content);
+      const res: any = await postComment(id, {
+        parentPickId: id, // Used to find the original author for the notification
+        placeData: {
+          name: pick.locationName || pick.place?.name,
+          category: pick.category,
+          lat: pick.location?.coordinates[1],
+          lng: pick.location?.coordinates[0],
+        },
+        reviewData: {
+          description: content,
+          stars: 0,
+        },
+      });
 
-      // Target the specific data block from your controller's { success, data } structure
       const savedComment = res?.data || res;
 
       if (savedComment && savedComment._id) {
-        toast.success("SIGNAL_DISPATCHED");
+        // 3. Terminology Sync [2026-02-01]
+        toast.success("Signal broadcasted successfully");
 
-        // 3. Reconciliation: Swap temp ID for permanent ID
+        // Reconciliation
         setComments((prev) =>
           prev.map((c) =>
             c._id === tempId
@@ -146,18 +156,17 @@ export default function PickDetailsPage() {
           ),
         );
       } else {
-        // Fallback: Trigger re-sync if server payload is incomplete
-        setTimeout(() => fetchData(), 500);
+        fetchData();
       }
     } catch (error) {
-      // 4. Rollback Protocol: Maintain system integrity on failure
+      // Rollback logic...
       setComments((prev) => prev.filter((c) => c._id !== tempId));
       setPick((prev: any) => ({
         ...prev,
         commentCount: Math.max(0, (prev?.commentCount || 0) - 1),
       }));
-      setNewComment(content); // Restore text so user doesn't lose their work
-      toast.error("DISPATCH_FAILED", { description: "SIGNAL_STABILITY_ERROR" });
+      setNewComment(content);
+      toast.error("DISPATCH_FAILED");
     } finally {
       setSubmitting(false);
     }

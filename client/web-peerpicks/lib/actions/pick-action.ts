@@ -1,7 +1,6 @@
 import { API } from "../api/endpoints";
 import axiosInstance from "../api/axios";
 
-
 /**
  * READ: Discovery Feed (Instagram-style)
  */
@@ -38,7 +37,7 @@ export const getPickDiscussion = async (pickId: string) => {
   try {
     const url = API.PICKS.DISCUSSION(pickId);
     const response: any = await axiosInstance.get(url);
-    
+
     // Unwrapping: Axios (.data) -> Controller (.data)
     // This returns the object { parent, signals, count } directly
     return response.data?.data || response.data;
@@ -51,19 +50,32 @@ export const getPickDiscussion = async (pickId: string) => {
 /**
  * SOCIAL: Post a comment to a specific pick
  */
-export const postComment = async (pickId: string, description: string) => {
-  // Ensure the body key matches your backend controller (content vs description)
-  const result = await axiosInstance.post(API.COMMENTS.CREATE, {
-    content: description, 
-    pickId: pickId,
-  });
-  return result;
+export const postComment = async (pickId: string, payload: any) => {
+  try {
+    // If payload is a string (fallback), wrap it,
+    // but ideally, we always pass the object from the UI now.
+    const data =
+      typeof payload === "string"
+        ? { reviewData: { description: payload, stars: 0 } }
+        : payload;
+
+    const response = await axiosInstance.post(API.COMMENTS.CREATE, {
+      ...data,
+      parentPickId: pickId, // Ensure the parent linkage is preserved
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("TRANSMISSION_ERROR:", error);
+    throw error;
+  }
 };
 /**
  * SOCIAL: Update an existing comment
  * Allows users to edit their text signals without creating a new node.
  */
-export const updateComment = async (commentId: string, text: string) => { // Changed param name to 'text'
+export const updateComment = async (commentId: string, text: string) => {
+  // Changed param name to 'text'
   const result = await axiosInstance.patch(API.COMMENTS.UPDATE(commentId), {
     content: text, // Now 'text' is defined and matches the parameter
   });
@@ -147,10 +159,17 @@ export const getPickDetail = async (pickId: string) => {
  * READ: Fetch all picks by a specific user
  */
 export const getUserPicks = async (userId: string) => {
-  const result = await axiosInstance.get(API.PICKS.USER_PICKS(userId));
-  return result;
-};
+  try {
+    const res = await axiosInstance.get(API.PICKS.USER_PICKS(userId), {
+      withCredentials: true,
+    });
 
+    return res.data;
+  } catch (err) {
+    console.error("getUserPicks error:", err);
+    return { data: [] };
+  }
+};
 /**
  * READ: Fetch picks within a specific radius
  */
@@ -171,15 +190,16 @@ export const getNearbyPicks = async (
 export const handleToggleSave = async (pickId: string) => {
   try {
     const response: any = await axiosInstance.post(API.PICKS.FAVORITE(pickId));
-    
+
     // Most backends return the NEW state after the toggle
-    // If it was saved, it returns isFavorited: true. 
+    // If it was saved, it returns isFavorited: true.
     // If it was unsaved, it returns isFavorited: false.
-    const isSaved = response?.data?.isFavorited ?? response?.isFavorited ?? false;
+    const isSaved =
+      response?.data?.isFavorited ?? response?.isFavorited ?? false;
 
     return {
       success: true,
-      isFavorited: isSaved // This is key for the animation logic
+      isFavorited: isSaved, // This is key for the animation logic
     };
   } catch (error: any) {
     console.error("FAVORITE_TOGGLE_FAILURE:", error);
@@ -193,5 +213,23 @@ export const handleDeletePick = async (pickId: string) => {
     return { success: true };
   } catch (error: any) {
     return { success: false };
+  }
+};
+
+/**
+ * READ: Fetch saved picks for logged-in user
+ * IMPORTANT: This endpoint does NOT take userId
+ */
+export const getSavedPicks = async () => {
+  try {
+    const res: any = await axiosInstance.get(API.PICKS.MY_FAVORITES, {
+      withCredentials: true,
+    });
+
+    // Axios unwrap: res.data → { success, data }
+    return res.data;
+  } catch (err) {
+    console.error("getSavedPicks error:", err);
+    return { data: [] };
   }
 };

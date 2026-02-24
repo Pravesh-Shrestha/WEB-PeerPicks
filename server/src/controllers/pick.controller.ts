@@ -88,31 +88,19 @@ export const pickController = {
       const { userId } = req.params;
       const currentUserId = (req.user as any)?._id;
 
-      // FIX: Use 'userRepo' instance instead of the Class name
-      const user = await userRepo.getUserById(userId);
-      if (!user) throw new HttpError(404, "User not found");
-
-      const picks = await pickService.getPicksByUser(userId, currentUserId);
-
-      // FIX: Use 'userRepo' instance here as well
-      const isFollowing = currentUserId
-        ? await userRepo.isFollowing(currentUserId, userId)
-        : false;
+      const data = await pickService.getPicksByUser(userId, currentUserId);
 
       res.status(200).json({
         success: true,
-        data: {
-          profile: { ...user.toObject(), isFollowing },
-          picks: picks,
-        },
+        data: data, // <-- just return service result directly
       });
     } catch (error: any) {
-      res
-        .status(error.statusCode || 500)
-        .json({ success: false, message: error.message });
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message,
+      });
     }
   },
-
   /**
    * READ: Place Hub Data
    */
@@ -222,6 +210,4 @@ export const pickController = {
       res.status(500).json({ success: false, message: error.message });
     }
   },
-  
 };
-

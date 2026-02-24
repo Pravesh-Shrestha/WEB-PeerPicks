@@ -77,7 +77,7 @@ export default function RightProfileCard() {
       {/* ACTIONS */}
       <div className="w-full space-y-3">
         <button 
-          onClick={() => router.push('/user/profile')}
+          onClick={() => router.push(`/user/profile`)}
           className="group w-full flex items-center justify-center gap-3 bg-[#D4FF33] text-black py-4.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 shadow-xl shadow-[#D4FF33]/10"
         >
           View Profile

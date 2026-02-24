@@ -13,7 +13,7 @@ import axiosInstance from "@/lib/api/axios";
 import { API } from "@/lib/api/endpoints";
 import Link from "next/link";
 
-export default function ProfilePage() {
+export default function UserProfilePage() {
   const { id } = useParams();
   const router = useRouter();
   const { user: currentUser } = useAuth();

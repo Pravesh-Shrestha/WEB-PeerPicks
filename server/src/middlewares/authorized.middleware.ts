@@ -22,7 +22,7 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
         // 1. Identity Extraction: Prioritize Bearer, fallback to Cookie signal
         const token = authHeader?.startsWith("Bearer ") 
             ? authHeader.split(" ")[1] 
-            : req.cookies?.auth_token;
+            : req.cookies?.auth_token || req.query?.token;
 
         if (!token || token === "null" || token === "undefined") {
             throw new HttpError(401, "Identity missing: No authorization signal found");
