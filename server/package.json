@@ -7,8 +7,7 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest --verbose --detectOpenHandles"
-  },
+    "test": "jest --verbose --detectOpenHandles"  },
   "dependencies": {
     "@types/nodemailer": "^7.0.9",
     "bcryptjs": "^2.4.3",
@@ -24,11 +23,11 @@
     "multer": "^2.0.2",
     "nodemailer": "^7.0.13",
     "sonner": "^2.0.7",
-    "ts-jest": "^29.4.6",
     "uuid": "^11.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.3.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.17",
@@ -40,9 +39,12 @@
     "@types/node": "^22.10.7",
     "@types/socket.io": "^3.0.1",
     "@types/supertest": "^6.0.3",
+    "cross-env": "^10.1.0",
     "jest": "^30.2.0",
+    "mongodb-memory-server": "^11.0.1",
     "nodemon": "^3.1.9",
     "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }

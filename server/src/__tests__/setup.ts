@@ -1,23 +1,26 @@
-import { connectDB } from "../database/database.db";
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+import { MongoMemoryServer } from "mongodb-memory-server";
+
+let mongo: MongoMemoryServer;
+
 beforeAll(async () => {
-    await connectDB();
+  mongo = await MongoMemoryServer.create();
+  const uri = mongo.getUri();
+
+  await mongoose.connect(uri);
+});
+
+afterEach(async () => {
+  if ((globalThis as any).__SKIP_DB_CLEANUP__) return;
+
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    const collection = collections[key];
+    await collection.deleteMany({});
+  }
 });
 
 afterAll(async () => {
-    // Add any teardown logic if necessary
-    await mongoose.connection.close();
+  await mongoose.disconnect();
+  await mongo.stop();
 });
-
-//=================TEST DATABASE============================================
-// export const connectDBTest = async () => {
-//     const testUri = MONGO_URI + "_test"; // Use a separate test database
-//     try{
-//         await mongoose.connect(testUri);
-//         console.log("MongoDB Test Database connected!");
-//     }catch(error){
-//         console.error("Database error:", error);
-//         process.exit(1); // Exit process with failure
-//     }
-// }
-//==========================================================================

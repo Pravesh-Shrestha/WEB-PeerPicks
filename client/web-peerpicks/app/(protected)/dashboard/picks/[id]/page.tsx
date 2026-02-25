@@ -124,18 +124,9 @@ export default function PickDetailsPage() {
       }));
 
       const res: any = await postComment(id, {
-        parentPickId: id, // Used to find the original author for the notification
-        placeData: {
-          name: pick.locationName || pick.place?.name,
-          category: pick.category,
-          lat: pick.location?.coordinates[1],
-          lng: pick.location?.coordinates[0],
-        },
-        reviewData: {
-          description: content,
-          stars: 0,
-        },
-      });
+      pickId: id,   // Backend expects 'pickId'
+      content: content, // Backend expects 'content'
+    });
 
       const savedComment = res?.data || res;
 

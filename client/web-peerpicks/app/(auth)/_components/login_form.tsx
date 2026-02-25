@@ -27,8 +27,6 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   // 1. FIXED REDIRECT LOGIC:
-  // Dependency array size is now constant.
-  // We check for 'auth_token' to match your cookie library.
   useEffect(() => {
     const hasToken = document.cookie
       .split("; ")
@@ -75,7 +73,7 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto" data-testid="login-container">
       <div className="mb-6">
         <h2 className="text-3xl font-bold text-white tracking-tight">
           Welcome back
@@ -93,6 +91,7 @@ export default function LoginForm() {
 
       {message && (
         <div
+          data-testid="login-status-message"
           className={`flex items-center gap-2 border p-3 rounded-xl mb-6 text-xs font-medium animate-in fade-in slide-in-from-top-2 ${
             isSuccess
               ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400"
@@ -112,6 +111,7 @@ export default function LoginForm() {
             >
               <input
                 {...register("email")}
+                data-testid="login-email-input"
                 placeholder="Email Address"
                 className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
               />
@@ -130,6 +130,7 @@ export default function LoginForm() {
             >
               <input
                 {...register("password")}
+                data-testid="login-password-input"
                 type={showPassword ? "text" : "password"}
                 placeholder="Password"
                 className="w-full bg-transparent text-slate-900 text-xs focus:outline-none font-semibold"
@@ -156,7 +157,6 @@ export default function LoginForm() {
         <div className="flex justify-end">
           <Link
             href="/forget_password"
-            university-style="true"
             className="text-[10px] text-slate-500 hover:text-white transition-colors font-medium"
           >
             Forgot password?
@@ -166,6 +166,7 @@ export default function LoginForm() {
         <button
           disabled={isSubmitting || isSuccess}
           type="submit"
+          data-testid="login-submit-button"
           className={`w-full text-white text-xs font-bold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${
             isSuccess
               ? "bg-emerald-600"
@@ -174,7 +175,7 @@ export default function LoginForm() {
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={14} className="animate-spin" data-testid="login-loader" />
               Verifying...
             </>
           ) : isSuccess ? (

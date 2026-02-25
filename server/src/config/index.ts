@@ -9,6 +9,8 @@ export const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3000
 // Database URI - prioritizing local URI for development stability
 export const MONGO_URI: string = process.env.LOCAL_DATABASE_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/peerpicks_db';
 
+
+
 // Auth Settings
 export const JWT_SECRET: string = process.env.JWT_SECRET || 'merosecretkey12345';
 export const JWT_EXPIRE: string = process.env.JWT_EXPIRE || '30d';

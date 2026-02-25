@@ -52,19 +52,17 @@ export const getPickDiscussion = async (pickId: string) => {
  */
 export const postComment = async (pickId: string, payload: any) => {
   try {
-    // If payload is a string (fallback), wrap it,
-    // but ideally, we always pass the object from the UI now.
-    const data =
-      typeof payload === "string"
-        ? { reviewData: { description: payload, stars: 0 } }
-        : payload;
+    // If payload is just a string, convert to object. 
+    // Otherwise, send the payload as-is.
+    const data = typeof payload === "string" 
+      ? { pickId, content: payload } 
+      : payload;
 
-    const response = await axiosInstance.post(API.COMMENTS.CREATE, {
-      ...data,
-      parentPickId: pickId, // Ensure the parent linkage is preserved
-    });
+    // We no longer spread and add 'parentPickId' because 
+    // the controller wants 'pickId' inside the body.
+    const response = await axiosInstance.post(API.COMMENTS.CREATE, data);
 
-    return response.data;
+    return response; // axiosInstance already returns .data
   } catch (error) {
     console.error("TRANSMISSION_ERROR:", error);
     throw error;

@@ -20,16 +20,39 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
         const authHeader = req.headers.authorization;
         
         // 1. Identity Extraction: Prioritize Bearer, fallback to Cookie signal
-        const token = authHeader?.startsWith("Bearer ") 
-            ? authHeader.split(" ")[1] 
-            : req.cookies?.auth_token || req.query?.token;
+        let token: string | undefined;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.split(" ")[1];
+        }
 
-        if (!token || token === "null" || token === "undefined") {
-            throw new HttpError(401, "Identity missing: No authorization signal found");
+        // 2. Fallback to cookie token
+        if (!token) {
+            const rawCookie = req.headers.cookie || "";
+            const cookies = Object.fromEntries(
+                rawCookie
+                    .split(";")
+                    .map((c) => c.trim())
+                    .filter(Boolean)
+                    .map((c) => {
+                        const i = c.indexOf("=");
+                        return i === -1 ? [c, ""] : [c.slice(0, i), decodeURIComponent(c.slice(i + 1))];
+                    })
+            ) as Record<string, string>;
+
+            token =
+                cookies.auth_token ||
+                cookies.token ||
+                cookies.access_token ||
+                cookies.jwt;
+        }
+
+        if (!token || token === "undefined") {
+            throw new HttpError(401, "Authorization token missing or malformed");
         }
 
         // 2. Token Verification
         const decoded = jwt.verify(token, JWT_SECRET) as Record<string, any>;
+        if (!decoded || !decoded.id) throw new HttpError(401, "Invalid token");
 
         const userId = decoded.id || decoded._id || decoded.sub;
         if (!userId) {

@@ -232,7 +232,7 @@ export const PickCard = ({
 
  return (
     <>
-      <div className="relative w-full max-w-md mx-auto mb-4 group/card px-2">
+      <div className="relative w-full max-w-2xl mx-auto mb-4 group/card px-1">
         <div className="w-full bg-[#121214] border border-white/[0.08] rounded-[1.25rem] overflow-hidden shadow-xl transition-all duration-300 hover:border-[#D4FF33]/30">
           
           {/* HEADER - Tightened padding and font */}
@@ -247,7 +247,7 @@ export const PickCard = ({
               <div>
                 <h4 
                   onClick={navigateToProfile}
-                  className="text-xs font-bold text-white leading-tight cursor-pointer hover:text-[#D4FF33] transition-colors"
+                  className="text-base font-bold text-white leading-tight cursor-pointer hover:text-[#D4FF33] transition-colors"
                 >
                   {authorName}
                 </h4>
@@ -259,7 +259,7 @@ export const PickCard = ({
                   className="flex items-center gap-1 mt-0.5 text-zinc-400 hover:text-[#D4FF33] transition-colors group/loc"
                 >
                   <MapPin size={8} className="text-[#D4FF33]" />
-                  <span className="text-[9px] font-mono uppercase tracking-tighter truncate max-w-[120px]">
+                  <span className="text-[15px] font-mono uppercase tracking-tighter truncate max-w-[120px]">
                     {hasValidName ? (pick.locationName || pick.placeDetails?.name) : "Copy_Coordinates"}
                   </span>
                   {!hasValidName && coords && <Copy size={8} className="ml-1 opacity-50" />}
