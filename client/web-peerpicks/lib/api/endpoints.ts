@@ -11,6 +11,7 @@ export const API = {
   },
 
   USERS: {
+    BASE: "/api/users",
     PROFILE: (id: string) => `/api/picks/user/${id}`,
     FOLLOW: (id: string) => `/api/social/follow/${id}`,
     UNFOLLOW: (id: string) => `/api/social/unfollow/${id}`,
@@ -44,6 +45,7 @@ export const API = {
   ADMIN: {
     USERS: "/api/admin/users",
     STATS: "/api/admin/dashboard-stats",
+    PICKS: "/api/admin/picks",
   },
 
   /**

@@ -1,6 +1,16 @@
 "use server";
 
-import { register, login, whoami, updateProfile, requestPasswordReset, resetPassword } from '../api/auth';
+import { 
+    register, 
+    login, 
+    whoami, 
+    updateProfile, 
+    requestPasswordReset, 
+    resetPassword,
+    adminGetAllUsers,
+    adminUpdateUser,
+    adminDeleteUser
+} from '../api/auth';
 import { SignupData } from '../../app/(auth)/schema'; 
 import { setAuthToken, setUserData, clearAuthCookies } from '../cookie';
 import { redirect } from 'next/navigation';
@@ -12,7 +22,6 @@ import axiosInstance from '../api/axios';
  * Shared error utility for Server Actions
  */
 const serverActionError = (error: any, context: string) => {
-    // If it's a redirect error, re-throw it so Next.js can handle it
     if (error.digest?.includes('NEXT_REDIRECT')) throw error;
     
     console.error(`${context} Error:`, error.response?.data?.message || error.message || error);
@@ -21,72 +30,54 @@ const serverActionError = (error: any, context: string) => {
         message: error.response?.data?.message || error.message || 'An unexpected error occurred' 
     };
 };
+
+/* --- AUTH ACTIONS --- */
+
 export const handleRegister = async (data: SignupData) => {
     try {
         const result = await register(data);
-        const createdUser = result?.user ?? result?.data ?? null;
-
-        if (createdUser || result?.id) {
+        if (result.success) {
             return {
                 success: true,
-                message: result?.message || "Registration successful",
-                data: createdUser ?? result,
+                message: result.message || "Registration successful",
+                data: result.user ?? result.data ?? result,
             };
         }
-        return { success: false, message: result?.message || "Registration failed" };
+        return result;
     } catch (error) {
         return serverActionError(error, "Registration");
     }
 };
 
 export const handleLogin = async (data: { email: string; password: string }) => {
-  let isSuccessful = false;
-  let authData = null;
+    try {
+        // 1. DELETE PROTOCOL: Clear stale signals before fresh handshake
+        await clearAuthCookies();
 
-  try {
-    // 1. DELETE PROTOCOL: Clear stale signals before fresh handshake
-    await clearAuthCookies();
+        // 2. IDENTITY HANDSHAKE
+        const result = await login(data);
 
-    // 2. IDENTITY HANDSHAKE: Request session from backend
-    const result = await login(data);
+        if (result.success && result.token) {
+            const userData = result.user || result.data;
+            
+            // 3. COMMIT PERSISTENCE
+            await setAuthToken(result.token);
+            await setUserData(userData);
 
-    if (result?.token && (result?.user || result?.data)) {
-      const userData = result.user || result.data;
-      
-      // 3. COMMIT PERSISTENCE: Set server-side cookies
-      await setAuthToken(result.token);
-      await setUserData(userData);
+            // 4. CACHE REFRESH
+            revalidatePath('/', 'layout');
+            revalidatePath('/admin');
+            revalidatePath('/dashboard');
 
-      // Store data to return to the client-side context
-      authData = {
-        user: userData,
-        token: result.token
-      };
-      
-      isSuccessful = true;
-    } else {
-      return { 
-        success: false, 
-        message: result?.message || "Invalid credentials provided." 
-      };
+            return { success: true, data: userData, token: result.token };
+        } 
+        return { 
+            success: false, 
+            message: result.message || "Invalid credentials provided." 
+        };
+    } catch (error: any) {
+        return serverActionError(error, "Login");
     }
-  } catch (error: any) {
-    // If it's a redirect error from Next.js, let it bubble up
-    if (error.digest?.includes('NEXT_REDIRECT')) throw error;
-    
-    console.error("LOGIN_EXECUTION_ERROR:", error.message);
-    return { success: false, message: error.message || "Login failed" };
-  }
-
-  if (isSuccessful) {
-    // 4. CACHE PURGE: Invalidate stale dashboard layouts
-    revalidatePath('/', 'layout');
-    revalidatePath('/dashboard');
-
-    // 5. RETURN SIGNAL: Send data back to AuthContext for instant UI sync
-    // We don't redirect here if we want the Client Component to handle it after loginSync
-    return { success: true, data: authData?.user, token: authData?.token };
-  }
 };
 
 export const handleLogout = async () => {
@@ -98,49 +89,133 @@ export const handleLogout = async () => {
     redirect("/login");
 };
 
-/**
- * Used for fetching the logged-in user's state to compare 
- * against profile owners for the "Edit/Delete" visibility.
- */
 export const handleWhoAmI = async () => {
     try {
-        const res: any = await axiosInstance.get(API.AUTH.WHOAMI);
-        // If your controller returns { user: {...} }, grab res.user
-        // If it returns the user directly, just use res
-        const userData = res.user || res; 
-        
-        return { success: true, data: userData };
+        const result = await whoami();
+        if (result.success) {
+            return { success: true, data: result.user || result.data || result };
+        }
+        return result;
     } catch (error: any) {
-        console.error(`[AUTH_SYNC_FAILURE]: 404 at ${error.config?.url}`); 
-        return { success: false, message: "Endpoint not found" };
+        return serverActionError(error, "WhoAmI");
     }
 };
 
-export const handleUpdateProfile = async (formData: any) => {
+/* --- PROFILE ACTIONS --- */
+
+export const handleUpdateProfile = async (formData: FormData) => {
     try {
         const result = await updateProfile(formData);
         if (result.success) {
-            await setUserData(result.data);
-            // Revalidate the profile path so the new image/name shows up immediately
-            revalidatePath("user/profile");
-            return { success: true, message: "Profile updated successfully", data: result.data };
+            const userData = result.data || result.user;
+            await setUserData(userData);
+            revalidatePath("/", "layout");
+            return { success: true, message: "Profile synchronized", data: userData };
         }
-        return { success: false, message: result.message || "Update failed" };
+        return result;
     } catch (error) {
         return serverActionError(error, "UpdateProfile");
     }
 };
 
+/* --- ADMIN MANAGEMENT ACTIONS --- */
+
+/**
+ * FETCH_PEER_DIRECTORY: Get all users for the admin table
+ */
+export const handleAdminGetUsers = async () => {
+    try {
+        const result = await adminGetAllUsers();
+        return result; // handleRequest already formatted this
+    } catch (error) {
+        return serverActionError(error, "AdminFetchUsers");
+    }
+};
+
+/**
+ * ADMIN_IDENTITY_UPDATE: Modify user from admin panel
+ */
+export const handleAdminUpdateUser = async (id: string, formData: FormData) => {
+    try {
+        const result = await adminUpdateUser(id, formData);
+        if (result.success) {
+            revalidatePath("/admin/users");
+            return { success: true, message: "Identity updated by Root_Auth" };
+        }
+        return result;
+    } catch (error) {
+        return serverActionError(error, "AdminUpdateUser");
+    }
+};
+
+/**
+ * ADMIN_DELETE_PROTOCOL: [2026-02-01] Permanent removal of identity
+ */
+export const handleAdminDeleteUser = async (id: string) => {
+    try {
+        const result = await adminDeleteUser(id);
+        if (result.success) {
+            revalidatePath("/admin/users");
+            return { success: true, message: "Identity deleted from registry" };
+        }
+        return result;
+    } catch (error) {
+        return serverActionError(error, "AdminDeleteUser");
+    }
+};
+
+/* --- PASSWORD RECOVERY --- */
+
 export const handleResetPassword = async (token: string, newPassword: string) => {
     try {
-        const cleanToken = decodeURIComponent(token).replace(/^token=/, '');
-        const response = await resetPassword(cleanToken, newPassword);
-        
-        return response.success 
+        const result = await resetPassword(token, newPassword);
+        return result.success 
             ? { success: true, message: 'Password has been reset successfully' }
-            : { success: false, message: response.message || 'Reset password failed' };
+            : result;
     } catch (error) {
         return serverActionError(error, "ResetPassword");
     }
 };
 
+/**
+ * FETCH_ADMIN_STATS: Aggregated data for the dashboard overview
+ * Matches backend AdminController.getDashboardStats structure
+ */
+export const handleAdminGetStats = async () => {
+    try {
+        const result: any = await axiosInstance.get(API.ADMIN.STATS);
+        
+        // The backend returns { success: true, stats: {...}, recentActivity: [...] }
+        // We return the whole object so the UI can access both stats and recentActivity
+        if (result.success) {
+            return {
+                success: true,
+                stats: result.stats,
+                recentActivity: result.recentActivity
+            };
+        }
+        
+        return result;
+    } catch (error) {
+        return serverActionError(error, "AdminGetStats");
+    }
+};
+/**
+ * ADMIN_FETCH_SINGLE_IDENTITY: Retrieve a specific user by ID
+ */
+export const handleAdminGetUserById = async (id: string) => {
+    try {
+        // Using the same pattern as your other admin actions
+        const result: any = await axiosInstance.get(`${API.ADMIN.USERS}/${id}`);
+        
+        if (result.success) {
+            return { 
+                success: true, 
+                data: result.user || result.data || result 
+            };
+        }
+        return result;
+    } catch (error) {
+        return serverActionError(error, "AdminFetchSingleUser");
+    }
+};

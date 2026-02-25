@@ -1,48 +1,26 @@
-// app/admin/layout.tsx
+"use client";
 import React from "react";
-import Link from "next/link";
+import Sidebar from "./_components/sidebar";
+import AdminNav from "./_components/admin-nav";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const menuItems = [
-    { name: "Dashboard", path: "/admin", icon: "📊" },
-    { name: "Manage Peers", path: "/admin/users", icon: "👥" },
-    { name: "Register New", path: "/admin/users/create", icon: "➕" },
-  ];
-
+  // Logic: Insert your Auth check here. If not admin, redirect to /
+  
   return (
-    <div className="flex min-h-screen bg-[#0B0C10]">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-white/10 bg-[#0B0C10] p-6 fixed h-full">
-        <div className="mb-10 px-2">
-          <h2 className="text-[#D4FF33] font-black text-2xl italic">PEERPICKS</h2>
-          <p className="text-[10px] text-gray-500 uppercase tracking-widest">Admin Terminal</p>
-        </div>
-
-        <nav className="space-y-2">
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              href={item.path}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:text-[#D4FF33] hover:bg-white/5 transition-all group"
-            >
-              <span>{item.icon}</span>
-              <span className="font-bold text-sm uppercase italic group-hover:translate-x-1 transition-transform">
-                {item.name}
-              </span>
-            </Link>
-          ))}
-        </nav>
-
-        <div className="absolute bottom-8 left-6 right-6">
-          <Link href="/dashboard" className="text-xs text-gray-500 hover:text-white transition">
-            ← Back to Main App
-          </Link>
-        </div>
+    <div className="min-h-screen bg-[#050505] text-white flex overflow-hidden">
+      {/* SIDEBAR - Fixed Width */}
+      <aside className="w-72 border-r border-white/5 bg-[#0A0A0A] hidden lg:block">
+        <Sidebar />
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 ml-64 p-8">
-        <div className="max-w-6xl mx-auto">
+      {/* MAIN VIEWPORT */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        {/* Animated Grid Overlay for that "Terminal" look */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+        
+        <AdminNav />
+        
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10 relative z-10">
           {children}
         </div>
       </main>

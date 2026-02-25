@@ -233,3 +233,70 @@ export const getSavedPicks = async () => {
     return { data: [] };
   }
 };
+
+/**
+ * ADMIN: Global Registry Feed
+ * Mirrors the 'getDiscoveryFeed' architecture for reliable data flow.
+ */
+export const handleAdminGetAllPicks = async () => {
+  try {
+    const response = await axiosInstance.get(API.ADMIN.PICKS);
+    return response;   // ✅ interceptor already unwrapped
+  } catch (error: any) {
+    return { success: false, picks: [] };
+  }
+};
+/**
+ * ADMIN: Update Pick Content
+ * Allows modification of descriptions, categories, or metadata.
+ */
+export const handleAdminUpdatePick = async (pickId: string, updateData: any) => {
+  try {
+    const response: any = await axiosInstance.patch(
+      API.PICKS.UPDATE(pickId),
+      updateData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("ADMIN_PICK_UPDATE_FAILURE:", error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Delete Pick [2026-02-01 Protocol]
+ * Permanently removes a pick from the network registry.
+ * Replaces all "purge" logic with "delete".
+ */
+export const handleAdminDeletePick  = async (pickId: string) => {
+  try {
+    const response: any = await axiosInstance.delete(API.PICKS.DELETE(pickId));
+    return {
+      success: true,
+      message: "PICK_DELETED_SUCCESSFULLY",
+      data: response.data
+    };
+  } catch (error: any) {
+    console.error("ADMIN_DELETE_PROTOCOL_FAILED:", error.response?.status);
+    return {
+      success: false,
+      message: error.response?.data?.message || "DELETE_ACTION_REJECTED"
+    };
+  }
+};
+
+/**
+ * ADMIN: Bulk Delete Picks
+ * Optimized for cleaning up spam or multiple violations.
+ */
+export const handleAdminBulkDeletePicks = async (pickIds: string[]) => {
+  try {
+    // Assuming backend supports a batch delete or mapping multiple requests
+    const deletions = pickIds.map(id => axiosInstance.delete(API.PICKS.DELETE(id)));
+    await Promise.all(deletions);
+    return { success: true, count: pickIds.length };
+  } catch (error) {
+    console.error("BULK_DELETE_FAILURE:", error);
+    throw error;
+  }
+};

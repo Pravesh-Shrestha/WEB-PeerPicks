@@ -63,4 +63,23 @@ PickSchema.index({ upvotes: 1 });
 PickSchema.index({ downvotes: 1 });
 PickSchema.index({ location: "2dsphere" });
 
+PickSchema.pre('findOneAndDelete', async function (next) {
+  const docToByDeleted = await this.model.findOne(this.getQuery());
+  
+  if (docToByDeleted) {
+    const { UserModel } = require('./user.model'); // Use require to avoid circular dependency
+    
+    // Remove this Pick ID from all users' savedPicks arrays
+    await UserModel.updateMany(
+      { savedPicks: docToByDeleted._id },
+      { $pull: { savedPicks: docToByDeleted._id } }
+    );
+
+    // Optional: If you have a 'Place' model that tracks its picks, 
+    // you would update that here too.
+    console.log(`Cascading delete: Removed references to Pick ${docToByDeleted._id}`);
+  }
+  next();
+});
+
 export default mongoose.models.Pick || mongoose.model<IPick>('Pick', PickSchema);

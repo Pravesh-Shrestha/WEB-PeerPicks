@@ -2,13 +2,18 @@ import axiosInstance from "./axios";
 import { API } from "./endpoints";
 
 /**
- * Helper to reduce repetition in error handling and data extraction.
- * Standardizing this ensures we never return 'undefined' to the Server Actions.
+ * Standardized Request Handler
+ * [2026-02-01] Protocol: Ensures consistent data shape for Server Actions.
  */
 const handleRequest = async (request: Promise<any>, fallbackMsg: string) => {
   try {
-    const data = await request; // Axios interceptor already returned response.data
-    return data; 
+    const response = await request;
+    // Handle cases where axios might return the full response or just data
+    const data = response.data || response;
+    return {
+      success: true,
+      ...data
+    };
   } catch (err: any) {
     const message = err.response?.data?.message || err.message || fallbackMsg;
     return {
@@ -18,45 +23,16 @@ const handleRequest = async (request: Promise<any>, fallbackMsg: string) => {
   }
 };
 
+/* --- AUTHENTICATION FLOWS --- */
+
 export const register = (registerData: any) => 
   handleRequest(axiosInstance.post(API.AUTH.REGISTER, registerData), "Identity registration failed");
 
-// FIX: Now uses handleRequest to prevent the 'success of undefined' crash
 export const login = (data: any) => 
   handleRequest(axiosInstance.post(API.AUTH.LOGIN, data), "Authentication failed");
 
-// FIX: Added safety to whoami
 export const whoami = () => 
   handleRequest(axiosInstance.get(API.AUTH.WHOAMI), "Identity verification failed");
-
-export const updateProfile = async (updateData: FormData) => {
-  try {
-    const response = await axiosInstance.put(API.AUTH.UPDATEPROFILE, updateData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      withCredentials: true 
-    });
-    
-    return {
-      success: true,
-      data: response.data.user || response.data,
-      message: response.data.message || "Profile synchronized"
-    };
-  } catch (err: any) {
-    console.error("Profile Update Error:", err.response?.data || err.message);
-    return {
-      success: false,
-      message: err.response?.data?.message || err.message || "Synchronization failed"
-    };
-  }
-};
-
-export const adminUpdateUser = (id: string, formData: FormData) => 
-  handleRequest(
-    axiosInstance.put(`${API.ADMIN.USERS}/${id}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    }), 
-    "Admin update failed"
-  );
 
 export const requestPasswordReset = (email: string) => 
   handleRequest(axiosInstance.post(API.AUTH.REQUEST_PASSWORD_RESET, { email }), "Recovery request failed");
@@ -69,8 +45,47 @@ export const resetPassword = (token: string, newPassword: string) => {
   );
 };
 
+/* --- PROFILE & SOCIAL --- */
+
+export const updateProfile = (updateData: FormData) => 
+  handleRequest(
+    axiosInstance.put(API.AUTH.UPDATEPROFILE, updateData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    "Profile synchronization failed"
+  );
+
 export const getUserProfile = (userId: string) => 
   handleRequest(axiosInstance.get(API.USERS.PROFILE(userId)), "Fetching profile failed");
 
 export const toggleFollow = (userId: string) => 
   handleRequest(axiosInstance.post(API.USERS.FOLLOW(userId)), "Connection update failed");
+
+/* --- ADMIN: USER MANAGEMENT --- */
+
+/**
+ * FETCH_ALL_USERS: Root access to identity database
+ */
+export const adminGetAllUsers = () => 
+  handleRequest(axiosInstance.get(API.ADMIN.USERS), "Failed to retrieve user directory");
+
+/**
+ * UPDATE_USER: Root modification of peer data
+ */
+export const adminUpdateUser = (id: string, formData: FormData) => 
+  handleRequest(
+    axiosInstance.put(`${API.ADMIN.USERS}/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    }), 
+    "Admin update failed"
+  );
+
+/**
+ * DELETE_USER: [2026-02-01] Protocol Compliance
+ * Permanent removal of identity from registry.
+ */
+export const adminDeleteUser = (id: string) => 
+  handleRequest(
+    axiosInstance.delete(`${API.ADMIN.USERS}/${id}`),
+    "Identity deletion protocol failed"
+  );

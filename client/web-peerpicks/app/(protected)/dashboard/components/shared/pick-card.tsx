@@ -72,6 +72,15 @@ export const PickCard = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTray, setShowTray] = useState(false);
 
+  // --- NAVIGATION TO PROFILE ---
+  const navigateToProfile = () => {
+    if (authorId) {
+      // If it's the current user, go to their own profile, otherwise go to the dynamic user route
+      const profilePath = isAuthor ? `/user/profile` : `/dashboard/profile/${authorId}`;
+      router.push(profilePath);
+    }
+  };
+
   useEffect(() => {
     if (pick.hasUpvoted !== undefined) setVoteStatus(pick.hasUpvoted ? "up" : null);
     if (pick.upvoteCount !== undefined) setVoteCount(pick.upvoteCount);
@@ -221,28 +230,36 @@ export const PickCard = ({
     );
   };
 
-  return (
+ return (
     <>
-      <div className="relative w-full mb-6 group/card">
-        <div className="w-full bg-[#121214] border border-white/[0.08] rounded-[1.5rem] overflow-hidden shadow-xl transition-all duration-300 hover:border-[#D4FF33]/30">
+      <div className="relative w-full max-w-md mx-auto mb-4 group/card px-2">
+        <div className="w-full bg-[#121214] border border-white/[0.08] rounded-[1.25rem] overflow-hidden shadow-xl transition-all duration-300 hover:border-[#D4FF33]/30">
           
-          {/* HEADER */}
-          <div className="p-4 flex items-center justify-between border-b border-white/5 bg-white/[0.01] relative">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl border border-white/10 overflow-hidden bg-zinc-900 shadow-inner">
+          {/* HEADER - Tightened padding and font */}
+          <div className="p-3 flex items-center justify-between border-b border-white/5 bg-white/[0.01] relative">
+            <div className="flex items-center gap-2">
+              <div 
+                onClick={navigateToProfile}
+                className="w-8 h-8 rounded-lg border border-white/10 overflow-hidden bg-zinc-900 shadow-inner cursor-pointer hover:border-[#D4FF33]/50 transition-all active:scale-95"
+              >
                 <img src={authorAvatar} className="w-full h-full object-cover" alt="" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white leading-tight">{authorName}</h4>
+                <h4 
+                  onClick={navigateToProfile}
+                  className="text-xs font-bold text-white leading-tight cursor-pointer hover:text-[#D4FF33] transition-colors"
+                >
+                  {authorName}
+                </h4>
                 <a
                   href={hasValidName ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pick.locationName || pick.placeDetails?.name || "")}` : "#"}
                   target={hasValidName ? "_blank" : "_self"}
                   rel="noopener noreferrer"
                   onClick={handleLocationClick}
-                  className="flex items-center gap-1.5 mt-0.5 text-zinc-400 hover:text-[#D4FF33] transition-colors group/loc"
+                  className="flex items-center gap-1 mt-0.5 text-zinc-400 hover:text-[#D4FF33] transition-colors group/loc"
                 >
-                  <MapPin size={10} className="text-[#D4FF33]" />
-                  <span className="text-[10px] font-mono uppercase tracking-tighter truncate max-w-[140px]">
+                  <MapPin size={8} className="text-[#D4FF33]" />
+                  <span className="text-[9px] font-mono uppercase tracking-tighter truncate max-w-[120px]">
                     {hasValidName ? (pick.locationName || pick.placeDetails?.name) : "Copy_Coordinates"}
                   </span>
                   {!hasValidName && coords && <Copy size={8} className="ml-1 opacity-50" />}
@@ -250,41 +267,41 @@ export const PickCard = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="bg-[#D4FF33]/10 border border-[#D4FF33]/20 px-2 py-1 rounded-lg flex items-center gap-1">
-                <Star size={12} className="fill-[#D4FF33] text-[#D4FF33]" />
-                <span className="text-xs font-black text-[#D4FF33]">{pick.stars?.toFixed(1) || "0.0"}</span>
+            <div className="flex items-center gap-1.5">
+              <div className="bg-[#D4FF33]/10 border border-[#D4FF33]/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                <Star size={10} className="fill-[#D4FF33] text-[#D4FF33]" />
+                <span className="text-[10px] font-black text-[#D4FF33]">{pick.stars?.toFixed(1) || "0.0"}</span>
               </div>
               
               {isAuthor && (
-                <div className="relative ml-1">
+                <div className="relative">
                   <button 
                     onClick={() => setShowTray(!showTray)}
-                    className={`p-2 rounded-lg transition-colors ${showTray ? "text-[#D4FF33] bg-white/5" : "text-zinc-500 hover:text-white"}`}
+                    className={`p-1.5 rounded-md transition-colors ${showTray ? "text-[#D4FF33] bg-white/5" : "text-zinc-500 hover:text-white"}`}
                   >
-                    <MoreVertical size={18} />
+                    <MoreVertical size={16} />
                   </button>
                   <AnimatePresence>
                     {showTray && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setShowTray(false)} />
                         <motion.div 
-                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                          initial={{ opacity: 0, scale: 0.95, y: -5 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                          className="absolute right-0 mt-2 w-36 bg-[#1A1A1C] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden p-1"
+                          exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                          className="absolute right-0 mt-1 w-32 bg-[#1A1A1C] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden p-1"
                         >
                           <button 
                             onClick={() => { setIsEditing(true); setShowTray(false); }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-bold text-zinc-400 hover:text-[#D4FF33] hover:bg-white/5 rounded-lg transition-all uppercase tracking-widest"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-[9px] font-bold text-zinc-400 hover:text-[#D4FF33] hover:bg-white/5 rounded-lg transition-all uppercase tracking-widest"
                           >
-                            <Edit3 size={14} /> Edit
+                            <Edit3 size={12} /> Edit
                           </button>
                           <button 
                             onClick={() => { onDeleteClick(); setShowTray(false); }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-bold text-red-400 hover:text-red-500 hover:bg-red-500/5 rounded-lg transition-all uppercase tracking-widest"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-[9px] font-bold text-red-400 hover:text-red-500 hover:bg-red-500/5 rounded-lg transition-all uppercase tracking-widest"
                           >
-                            <Trash2 size={14} /> Delete
+                            <Trash2 size={12} /> Delete
                           </button>
                         </motion.div>
                       </>
@@ -295,113 +312,102 @@ export const PickCard = ({
             </div>
           </div>
 
-          {/* CARD MEDIA BOX */}
+          {/* CARD MEDIA BOX - Optimized containment */}
           <div 
             className="relative aspect-square w-full overflow-hidden bg-black cursor-zoom-in group/media flex items-center justify-center border-b border-white/5"
             onClick={() => setIsFullscreen(true)}
           >
-            {/* If fullscreen is on, we hide the card media to prevent double playback/audio */}
-            {!isFullscreen && mediaFiles.length > 0 ? (
-              renderMedia(mediaFiles[currentIndex], "w-full h-full object-contain")
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
-                {isFullscreen ? "Viewing_Main_Signal" : "Media_Offline"}
-              </div>
-            )}
+            <div className="absolute inset-0 z-0">
+               {!isFullscreen && mediaFiles.length > 0 && renderMedia(mediaFiles[currentIndex], "w-full h-full object-cover")}
+            </div>
             
             {!isFullscreen && mediaFiles.length > 1 && (
-              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 flex justify-between opacity-0 group-hover/media:opacity-100 transition-opacity pointer-events-none z-10">
-                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="p-2 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto"><ChevronLeft size={20} /></button>
-                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="p-2 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto"><ChevronRight size={20} /></button>
+              <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between opacity-0 group-hover/media:opacity-100 transition-opacity pointer-events-none z-20">
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto"><ChevronLeft size={16} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto"><ChevronRight size={16} /></button>
               </div>
             )}
             {!isFullscreen && (
-              <div className="absolute top-4 right-4 p-2 bg-black/40 backdrop-blur-md rounded-lg text-white opacity-0 group-hover/media:opacity-100 transition-opacity z-10">
-                <Maximize2 size={16} />
+              <div className="absolute top-3 right-3 p-1.5 bg-black/40 backdrop-blur-md rounded-lg text-white opacity-0 group-hover/media:opacity-100 transition-opacity z-20">
+                <Maximize2 size={12} />
               </div>
             )}
           </div>
 
-          {/* FOOTER AREA */}
-          <div className="p-5">
+          {/* FOOTER AREA - Compacted text and buttons */}
+          <div className="p-4">
             {isEditing ? (
-              <div className="space-y-3 mb-4">
+              <div className="space-y-2 mb-3">
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full bg-white/5 border border-[#D4FF33]/30 rounded-xl p-4 text-sm text-white outline-none focus:border-[#D4FF33] transition-all min-h-[100px]"
+                  className="w-full bg-white/5 border border-[#D4FF33]/30 rounded-lg p-3 text-xs text-white outline-none focus:border-[#D4FF33] transition-all min-h-[80px]"
                   autoFocus
                 />
-                <div className="flex gap-2">
-                  <button onClick={onUpdatePick} className="flex-1 py-2 bg-[#D4FF33] text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">
-                    <Check size={14} /> Commit_Changes
+                <div className="flex gap-1.5">
+                  <button onClick={onUpdatePick} className="flex-1 py-1.5 bg-[#D4FF33] text-black rounded-lg text-[9px] font-black uppercase tracking-widest hover:scale-[1.02] transition-transform flex items-center justify-center gap-1">
+                    <Check size={12} /> Save
                   </button>
-                  <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-white/5 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors">
+                  <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 bg-white/5 text-white rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors">
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="text-white text-sm font-medium leading-relaxed mb-6 line-clamp-3">
+              <p className="text-zinc-200 text-xs font-medium leading-snug mb-4 line-clamp-2">
                 {pick.description}
               </p>
             )}
 
-            <div className="grid grid-cols-4 gap-2 pt-4 border-t border-white/5">
-              <button onClick={onVoteClick} className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${voteStatus === "up" ? "bg-[#D4FF33] border-[#D4FF33] text-black" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
-                <ChevronUp size={18} strokeWidth={3} /><span className="text-xs font-bold font-mono">{voteCount}</span>
+            <div className="grid grid-cols-4 gap-1.5 pt-3 border-t border-white/5">
+              <button onClick={onVoteClick} className={`flex items-center justify-center gap-1 py-2 rounded-lg border transition-all ${voteStatus === "up" ? "bg-[#D4FF33] border-[#D4FF33] text-black" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
+                <ChevronUp size={16} strokeWidth={3} /><span className="text-[10px] font-bold font-mono">{voteCount}</span>
               </button>
-              <button onClick={onToggleSave} className={`flex items-center justify-center py-2.5 rounded-xl border transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/20 text-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.1)]" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
-                <Heart size={18} className={isFavorited ? "fill-pink-500" : ""} />
+              <button onClick={onToggleSave} className={`flex items-center justify-center py-2 rounded-lg border transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/20 text-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.1)]" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
+                <Heart size={16} className={isFavorited ? "fill-pink-500" : ""} />
               </button>
-              <button onClick={() => router.push(`/dashboard/picks/${pick._id}`)} className="flex items-center justify-center py-2.5 rounded-xl bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
-                <MessageCircle size={18} />
+              <button onClick={() => router.push(`/dashboard/picks/${pick._id}`)} className="flex items-center justify-center py-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
+                <MessageCircle size={16} />
               </button>
-              <button onClick={onShareClick} className="flex items-center justify-center py-2.5 rounded-xl bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
-                <Share2 size={18} />
+              <button onClick={onShareClick} className="flex items-center justify-center py-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
+                <Share2 size={16} />
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* TRUE FULLSCREEN LIGHTBOX */}
+      {/* FULLSCREEN LIGHTBOX */}
       <AnimatePresence>
         {isFullscreen && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            // Highest z-index to cover every UI element (Tabs, Navs, etc.)
             className="fixed inset-0 z-[999999] bg-black flex items-center justify-center w-screen h-screen overflow-hidden"
           >
-            {/* Background Closer */}
             <div className="absolute inset-0 z-0 cursor-zoom-out" onClick={() => setIsFullscreen(false)} />
             
-            {/* Close Button - Larger and more prominent */}
             <button 
               onClick={() => setIsFullscreen(false)} 
-              className="absolute top-8 right-8 z-[1000001] text-white p-4 bg-black/50 backdrop-blur-xl border border-white/20 rounded-full hover:bg-red-600 transition-all pointer-events-auto shadow-2xl"
+              className="absolute top-6 right-6 z-[1000001] text-white p-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full hover:bg-red-600 transition-all pointer-events-auto"
             >
-              <X size={32} />
+              <X size={24} />
             </button>
 
-            {/* Content Container - No padding, full width/height */}
             <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
               {mediaFiles.length > 1 && (
                 <>
-                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="absolute left-6 z-[1000001] p-6 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronLeft size={48} /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="absolute right-6 z-[1000001] p-6 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronRight size={48} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="absolute left-4 z-[1000001] p-4 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronLeft size={32} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="absolute right-4 z-[1000001] p-4 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronRight size={32} /></button>
                 </>
               )}
               
               <motion.div 
-                initial={{ scale: 1.1, opacity: 0 }} 
+                initial={{ scale: 1.05, opacity: 0 }} 
                 animate={{ scale: 1, opacity: 1 }} 
-                transition={{ duration: 0.3 }}
                 className="w-full h-full flex items-center justify-center pointer-events-auto"
               >
-                {/* true lightbox mode rendering */}
                 {renderMedia(mediaFiles[currentIndex], "w-screen h-screen object-contain", true)}
               </motion.div>
             </div>

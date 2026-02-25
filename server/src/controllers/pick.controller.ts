@@ -199,13 +199,15 @@ export const pickController = {
     }
   },
 
-  /**
-   * READ: Fetch all picks (Admin/Testing)
+ /**
+   * READ: Fetch all picks
+   * Used for the Pick_Registry UI
    */
   async getAllPicks(req: Request, res: Response) {
     try {
       const picks = await pickService.getAllPicks();
-      res.status(200).json({ success: true, data: picks });
+      // Use 'picks' key to match the AdminRegistry frontend expectations
+      res.status(200).json({ success: true, picks });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
