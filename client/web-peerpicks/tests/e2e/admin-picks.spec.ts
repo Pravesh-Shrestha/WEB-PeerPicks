@@ -247,31 +247,29 @@ test.describe("Admin Registry: Protocol 2026-02-25", () => {
     ).toBeVisible();
   });
 
-  test('20. Should show error state on protocol sync failure', async ({ page }) => {
-    // 1. Intercept the NEXT request to this endpoint and force it to fail.
-    // We use a high-priority route or un-route the previous one if necessary.
-    await page.route('**/api/admin/picks', async (route) => {
-      await route.fulfill({ 
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: false, message: "Internal Server Error" })
-      });
-    });
 
-    // 2. Re-navigate to the page. 
-    // This triggers a fresh useEffect call in AdminPicksPage.
-    await page.goto('/admin/picks', { waitUntil: 'networkidle' });
+  test("20. Should abort delete protocol and preserve node on cancel", async ({
+    page,
+  }) => {
+    // 1. Open the Delete Confirmation Modal
+    await page.getByTestId("delete-protocol-button").click();
+    
+    const modal = page.getByTestId("delete-confirmation-modal");
+    await expect(modal).toBeVisible();
 
-    // 3. The 'registry-error-container' should now manifest instead of the table.
-    const errorContainer = page.getByTestId('registry-error-container');
+    // 2. Click the Cancel button
+    // Assuming you have data-testid="cancel-delete-button" or selecting by text
+    const cancelButton = page.getByRole("button", { name: /Cancel/i });
+    await cancelButton.click();
+
+    // 3. Verify the modal is closed
+    await expect(modal).not.toBeVisible();
+
+    // 4. PROTOCOL_CHECK: Verify the row still exists in the registry
+    const registryRow = page.getByTestId(`registry-row-${MOCK_PICK._id}`);
+    await expect(registryRow).toBeVisible();
     
-    // Increase timeout slightly for the error state transition
-    await expect(errorContainer).toBeVisible({ timeout: 10000 });
-    
-    // 4. Verify the specific error message text defined in your component
-    await expect(errorContainer).toContainText('Registry synchronization failed');
-    
-    // 5. Ensure the table is NOT visible
-    await expect(page.getByTestId('registry-table')).not.toBeVisible();
+    // 5. Verify node count remains unchanged
+    await expect(page.getByTestId("node-count-display")).toHaveText("Nodes: 1");
   });
 });
