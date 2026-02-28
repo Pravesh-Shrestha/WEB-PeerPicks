@@ -10,25 +10,39 @@ async createComment(pickId: string, authorId: string, content: string) {
   if (!mongoose.Types.ObjectId.isValid(pickId)) {
     throw new Error("Invalid Transmission ID");
   }
-    // 1. Create Node
+    // 1. Resolve the parent pick; fail fast if missing
+    const parentPick = await Pick.findById(pickId).select("user alias author userId");
+    if (!parentPick) {
+      throw new Error("PICK_NOT_FOUND");
+    }
+
+    // 2. Create Node
     const comment = await Comment.create({ pick: pickId, author: authorId, content });
     
-    // 2. Sync Consensus (Incremental)
+    // 3. Sync Consensus (Incremental)
     await socialRepository.incrementCommentCount(pickId);
 
-    // 3. Dispatch Notification Signal
-    const parentPick = await Pick.findById(pickId);
-    if (parentPick && parentPick.author && parentPick.author.toString() !== authorId) {
+    // 4. Dispatch Notification Signal (supports legacy 'author' field just in case)
+    const pickOwnerId = (parentPick as any).user?.toString()
+      || (parentPick as any).author?.toString()
+      || (parentPick as any).userId?.toString();
+
+    if (!pickOwnerId) {
+      console.warn(`[COMMENT_NOTIFY_SKIP] Missing pick owner for pick ${pickId}`);
+    }
+
+    // Skip self-notify; send to pick owner when different
+    if (pickOwnerId && pickOwnerId !== authorId) {
       await notificationService.createNotification({
-        recipient: parentPick.author,
+        recipient: pickOwnerId,
         actor: authorId,
         type: 'COMMENT',
-        pickId: pickId,
-        message: `replied to your pick: "${parentPick.title}"`,
+        pickId,
+        message: `commented on your pick: "${parentPick?.alias || "Your pick"}"`,
       });
     }
 
-  return comment.populate('author', 'fullName profilePicture');
+  return await comment.populate('author', 'fullName profilePicture');
 }
   // READ (Thread)
 async getThreadByPickId(pickId: string) {

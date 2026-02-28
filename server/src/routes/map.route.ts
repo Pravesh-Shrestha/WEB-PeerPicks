@@ -9,11 +9,12 @@ const router = Router();
  */
 router.get('/nearby', async (req, res) => {
   try {
-    const lng = parseFloat(req.query.lng as string);
-    const lat = parseFloat(req.query.lat as string);
-    const radius = parseInt(req.query.radius as string) || 5000; // Default 5km
+    const lng = Number(req.query.lng);
+    const lat = Number(req.query.lat);
+    const parsedRadius = Number(req.query.radius);
+    const radius = Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 5000; // Default 5km
 
-    if (isNaN(lng) || isNaN(lat)) {
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
       return res.status(400).json({ 
         success: false, 
         message: "Spatial coordinates (lng, lat) are required for a regional scan." 
@@ -27,8 +28,9 @@ router.get('/nearby', async (req, res) => {
       count: transmissions.length,
       data: transmissions 
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Regional scan failed." });
+  } catch (error: any) {
+    console.error("/api/map/nearby error", error?.message || error);
+    res.status(500).json({ success: false, message: error?.message || "Regional scan failed." });
   }
 });
 

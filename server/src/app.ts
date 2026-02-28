@@ -112,16 +112,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// 7. RATE LIMITING
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 100,
-  skip: (req) =>
-    req.path === '/api/notifications/stream' ||
-    req.path === '/api/map/nearby',
-  message: { success: false, message: "RATE_LIMIT_EXCEEDED" }
-});
-app.use('/api/', limiter);
+// 7. RATE LIMITING (disabled in test or when explicitly requested to prevent CI 429s)
+const disableRateLimit = process.env.NODE_ENV === 'test' || process.env.DISABLE_RATE_LIMIT === 'true';
+if (!disableRateLimit) {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 1000,
+    skip: (req) =>
+      req.path === '/api/notifications/stream' ||
+      req.path === '/api/map/nearby',
+    message: { success: false, message: "RATE_LIMIT_EXCEEDED" }
+  });
+  app.use('/api/', limiter);
+}
 
 
 //6. ROUTE REGISTRATION (Sequential & Clean)

@@ -37,6 +37,14 @@ export const NotificationItem = ({
   const router = useRouter();
   const isSpecial = n.type === "WELCOME" || n.type === "SYSTEM";
 
+  const actorId = n?.actor?._id || n?.actor?.id || n?.actorId;
+
+  const handleActorClick = (e: React.MouseEvent) => {
+    if (n.type !== "FOLLOW" || !actorId) return;
+    e.stopPropagation();
+    router.push(`/dashboard/profile/${actorId}`);
+  };
+
   const handleSignalClick = () => {
     // Navigate using 'pickId' which aligns with your Repository populate
     if (n.pickId) {
@@ -81,7 +89,12 @@ export const NotificationItem = ({
             <SignalIcon type={n.type} />
           </div>
         ) : (
-          <div className="relative">
+          <button
+            type="button"
+            onClick={handleActorClick}
+            aria-label={n.type === "FOLLOW" ? "Open follower profile" : "Notification actor"}
+            className={`relative ${n.type === "FOLLOW" && actorId ? "cursor-pointer" : "cursor-default"}`}
+          >
             <img
               src={n.actor?.profilePicture || "/default-avatar.png"}
               className="w-12 h-12 rounded-2xl object-cover grayscale group-hover:grayscale-0 transition-all duration-700 border border-white/10"
@@ -90,7 +103,7 @@ export const NotificationItem = ({
             <div className="absolute -bottom-1 -right-1 p-1 bg-black rounded-lg border border-white/5">
               <SignalIcon type={n.type} />
             </div>
-          </div>
+          </button>
         )}
         {!n.read && (
           <span className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-[#D4FF33] rounded-full animate-pulse shadow-[0_0_10px_#D4FF33]" />

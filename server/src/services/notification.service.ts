@@ -17,6 +17,11 @@ export const notificationService = {
       return null;
     }
 
+    if (!recipientId) {
+      console.warn("[NOTIFY_SKIP] Missing recipient for", data.type, data.pickId || "no-pick-id");
+      return null;
+    }
+
     // 2. Build uniqueness query for upsertion
     // Casting to Types.ObjectId ensures schema compatibility
     const query: any = {
@@ -40,6 +45,11 @@ export const notificationService = {
       message: data.message || this.generateFallbackMessage(data.type),
       status: data.status || this.getStatusMap(data.type)
     };
+
+    // Ensure COMMENT notifications always carry actor for UI rendering
+    if (data.type === 'COMMENT' && !finalData.actor && actorId) {
+      finalData.actor = new Types.ObjectId(actorId);
+    }
 
     // Repository populates 'actor' internally
     const notification = await notificationRepository.upsertSocialNotification(query, finalData);

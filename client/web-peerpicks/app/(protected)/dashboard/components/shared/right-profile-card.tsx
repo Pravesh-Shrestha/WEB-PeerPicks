@@ -1,18 +1,24 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
-import { User as UserIcon, LogOut, ExternalLink, ShieldCheck } from 'lucide-react';
+import { User as UserIcon, LogOut, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function RightProfileCard() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = async () => {
-    const confirmed = window.confirm("Are you sure you want to logout?");
-    if (!confirmed) return;
-    await logout();
+  const executeLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+    }
   };
 
   // Unified color variables for internal consistency
@@ -91,12 +97,48 @@ export default function RightProfileCard() {
         </button>
 
         <button 
-          onClick={handleLogout}
+          onClick={() => setShowLogoutModal(true)}
           className="w-full flex items-center justify-center gap-3 bg-white/[0.03] text-zinc-500 py-4.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border border-white/[0.05] hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all duration-300"
         >
           <LogOut size={14} /> Logout
         </button>
       </div>
+
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !isLoggingOut && setShowLogoutModal(false)}
+          />
+          <div className="relative bg-[#0A0A0A] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">
+                Confirm_Logout
+              </h2>
+              <p className="text-zinc-500 text-xs mt-3 leading-relaxed">
+                Are you sure you want to end your session now?
+              </p>
+            </div>
+
+            <div className="flex gap-4 mt-10">
+              <button
+                disabled={isLoggingOut}
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-4 rounded-2xl bg-white/5 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isLoggingOut}
+                onClick={executeLogout}
+                className="flex-1 py-4 rounded-2xl bg-red-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-[0_0_30px_rgba(239,68,68,0.2)] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoggingOut ? <Loader2 size={14} className="animate-spin" /> : "Logout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FOOTER LEGAL */}
       <div className="mt-12 pt-8 border-t border-white/[0.05] w-full text-center space-y-2">

@@ -4,13 +4,16 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { useDashboard } from '@/app/context/DashboardContext';
+import { API } from '@/lib/api/endpoints';
 
 export default function SignalListener() {
   const { triggerRefresh } = useDashboard();
 
   useEffect(() => {
     // 1. Establish the connection to the route we created in the controller
-    const eventSource = new EventSource(`${process.env.NEXT_PUBLIC_API_URL}/notifications/stream`, {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+    const useBase = apiBase && apiBase !== 'undefined' && apiBase !== 'null' ? apiBase : '';
+    const eventSource = new EventSource(`${useBase}${API.NOTIFICATIONS.STREAM}`, {
       withCredentials: true 
     });
 

@@ -23,7 +23,9 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       : API.NOTIFICATIONS.STREAM;
 
     // 2. Point to the backend route (matches notification.route.ts)
-    const eventSource = new EventSource(`${process.env.NEXT_PUBLIC_API_URL || ''}${streamUrl}`, {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+    const useBase = apiBase && apiBase !== 'undefined' && apiBase !== 'null' ? apiBase : '';
+    const eventSource = new EventSource(`${useBase}${streamUrl}`, {
       withCredentials: true 
     });
 

@@ -13,24 +13,24 @@ const userRepository = new UserRepository();
 
 export class AuthService {
   async register(data: SignupDTO) {
-  // Normalize the email before checking and saving
-  const normalizedEmail = data.email.toLowerCase().trim();
-  const existingUser = await userRepository.findByEmail(normalizedEmail);
-  
-  if (existingUser) throw new HttpError(409, "User already exists");
+    // Normalize the email before checking and saving
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const existingUser = await userRepository.findByEmail(normalizedEmail);
 
-  const hashedPassword = await bcrypt.hash(data.password, 10);
+    if (existingUser) throw new HttpError(409, "User already exists");
 
-  const { password, ...safeData } = data;
-  const userDataToCreate = {
-    ...safeData,
-    email: normalizedEmail, // Save normalized
-    password: hashedPassword,
-    profilePicture: data.profilePicture || undefined,
-  };
+    const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  return await userRepository.create(userDataToCreate);
-}
+    const { password, ...safeData } = data;
+    const userDataToCreate = {
+      ...safeData,
+      email: normalizedEmail, // Save normalized
+      password: hashedPassword,
+      profilePicture: data.profilePicture || undefined,
+    };
+
+    return await userRepository.create(userDataToCreate);
+  }
   async login(data: LoginDTO) {
     const normalizedEmail = data.email.toLowerCase().trim();
     const user = await userRepository.findByEmail(normalizedEmail);
@@ -52,6 +52,11 @@ export class AuthService {
         fullName: user.fullName,
         dob: user.dob,
         profilePicture: user.profilePicture,
+        followerCount: user.followerCount || 0,
+        followingCount: user.followingCount || 0,
+        followers: user.followers || [],
+        following: user.following || [],
+        savedPicks: user.savedPicks || [],
       },
     };
   }
@@ -68,6 +73,11 @@ export class AuthService {
       // ADD THESE FIELDS:
       dob: user.dob,
       profilePicture: user.profilePicture,
+      followerCount: user.followerCount || 0,
+      followingCount: user.followingCount || 0,
+      followers: user.followers || [],
+      following: user.following || [],
+      savedPicks: user.savedPicks || [],
     };
   }
 
@@ -83,6 +93,11 @@ export class AuthService {
       // ADD THESE FIELDS:
       dob: user.dob,
       profilePicture: user.profilePicture,
+      followerCount: user.followerCount || 0,
+      followingCount: user.followingCount || 0,
+      followers: user.followers || [],
+      following: user.following || [],
+      savedPicks: user.savedPicks || [],
     };
   }
   async updateUser(userId: string, data: UpdateUserDTO) {

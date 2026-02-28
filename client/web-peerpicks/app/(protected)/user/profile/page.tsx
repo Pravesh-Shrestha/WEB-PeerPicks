@@ -22,6 +22,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"PICKS" | "SAVED">("PICKS");
 
+  const followerCount = user?.followerCount ?? user?.followers?.length ?? 0;
+  const followingCount = user?.followingCount ?? user?.following?.length ?? 0;
+
   // YOUR ORIGINAL LOGIC - UNTOUCHED
   const fetchProfileData = async () => {
     if (!user?.id) return;
@@ -97,9 +100,11 @@ export default function ProfilePage() {
               <h1 className="text-4xl font-black italic uppercase tracking-tighter mb-4">
                 {user?.fullName || "Active_Peer"}
               </h1>
-              <div className="flex justify-center md:justify-start gap-10 font-mono">
-                <StatBox value={userPicks.length} label="Signals" />
-                <StatBox value={user?.reputation || 0} label="Reputation" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 font-mono">
+                <StatBox value={userPicks.length} label="Picks" />
+                <StatBox value={savedPicks.length} label="Saved" />
+                <StatBox value={followerCount} label="Followers" />
+                <StatBox value={followingCount} label="Following" />
               </div>
             </div>
 

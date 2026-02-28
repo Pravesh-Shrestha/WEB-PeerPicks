@@ -19,6 +19,9 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -38,23 +41,31 @@ export default function UsersPage() {
     fetchUsers();
   }, []);
 
-  const onDelete = async (userId: string) => {
-    // Verified: Terminology updated to "Delete" as requested
-    if (confirm("IDENTITY_DELETION_CONFIRM: Permanent removal of identity? This action cannot be undone.")) {
-      const adminPassword = prompt("Enter your admin password to confirm deletion:");
+  const openDeleteModal = (userId: string) => {
+    setTargetUserId(userId);
+    setAdminPassword("");
+  };
 
-      if (!adminPassword || adminPassword.trim().length === 0) {
-        toast.error("Admin password is required to delete an account");
-        return;
-      }
+  const executeDelete = async () => {
+    if (!targetUserId) return;
+    if (!adminPassword.trim()) {
+      toast.error("Admin password is required to delete an account");
+      return;
+    }
 
-      const result = await handleAdminDeleteUser(userId, adminPassword);
+    try {
+      setDeleting(true);
+      const result = await handleAdminDeleteUser(targetUserId, adminPassword);
       if (result.success) {
         toast.success("Identity_Deleted_From_Registry");
-        fetchUsers(); 
+        fetchUsers();
+        setTargetUserId(null);
+        setAdminPassword("");
       } else {
         toast.error(result.message);
       }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -170,7 +181,7 @@ export default function UsersPage() {
                         <span className="text-[9px] font-bold uppercase hidden sm:block">Edit</span>
                       </button>
                       <button 
-                        onClick={() => onDelete(user._id)}
+                        onClick={() => openDeleteModal(user._id)}
                         className="p-2 hover:bg-red-500/10 rounded-lg text-zinc-500 hover:text-red-500 transition-all flex items-center gap-1.5"
                       >
                         <Trash2 size={14} />
@@ -184,6 +195,54 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
+      {targetUserId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !deleting && setTargetUserId(null)}
+          />
+          <div className="relative bg-[#0A0A0A] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">
+                Confirm_Delete
+              </h2>
+              <p className="text-zinc-500 text-xs mt-3 leading-relaxed">
+                Deleting this account is permanent. Enter your admin password to proceed.
+              </p>
+            </div>
+
+            <div className="mt-8 space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Admin Password</label>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-[#D4FF33]/40 outline-none"
+                placeholder="Enter password"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-4 mt-10">
+              <button
+                disabled={deleting}
+                onClick={() => setTargetUserId(null)}
+                className="flex-1 py-4 rounded-2xl bg-white/5 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleting}
+                onClick={executeDelete}
+                className="flex-1 py-4 rounded-2xl bg-red-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-[0_0_30px_rgba(239,68,68,0.2)] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
