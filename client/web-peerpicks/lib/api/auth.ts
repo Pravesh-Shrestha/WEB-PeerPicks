@@ -1,114 +1,99 @@
-import { useRouter } from "next/dist/client/components/navigation";
-import axios from "./axios";
-import { API } from "./endpoints";
-import { clearAuthCookies } from "../cookie";
 import axiosInstance from "./axios";
+import { API } from "./endpoints";
 
-export const register = async ( registerData : any ) => {
-    try{
-        const response = await axios.post(
-            API.AUTH.REGISTER, //path
-            registerData //body data
-        );
-        return response.data; // what controller from backend sends
-    } catch (err: Error | any) {
-        throw new Error(
-            // 400-500 err code counts as exception
-            err.response?.data?.message // log error message from backend
-             || err.message // default error message
-             || "Registration failed" //fallback message if default fails
-        );
+/**
+ * Standardized Request Handler
+ * [2026-02-01] Protocol: Ensures consistent data shape for Server Actions.
+ */
+const handleRequest = async (request: Promise<any>, fallbackMsg: string) => {
+  try {
+    const response = await request;
+    // Handle cases where axios might return the full response or just data
+    const data = response.data || response;
+    return {
+      success: true,
+      ...data
     };
-}
-
-export const login = async ( loginData : any ) => {
-    try{
-        const response = await axios.post(
-            API.AUTH.LOGIN, //path=
-            loginData //body data
-        );
-        return response.data; // what controller from backend sends
-    } catch (err: Error | any) {
-        throw new Error(
-            // 400-500 err code counts as exception
-            err.response?.data?.message // log error message from backend
-             || err.message // default error message
-             || "Login failed" //fallback message if default fails
-        );
+  } catch (err: any) {
+    const message = err.response?.data?.message || err.message || fallbackMsg;
+    return {
+      success: false,
+      message: message
     };
-}
-
-export const whoami = async () => {
-    try{
-        const response = await axios.get(
-            API.AUTH.WHOAMI //path
-        );
-        return response.data; // what controller from backend sends
-    } catch (err: Error | any) {
-        throw new Error(
-            // 400-500 err code counts as exception
-            err.response?.data?.message // log error message from backend
-             || err.message // default error message
-             || "Fetching user info failed" //fallback message if default fails
-        );
-    };
-}
-
-export const updateProfile = async (updateData: FormData) => {
-    try {
-        const response = await axios.put(
-            API.AUTH.UPDATEPROFILE, 
-            updateData, 
-            { 
-                headers: { 
-                    // Axios automatically sets the boundary for FormData
-                    'Content-Type': 'multipart/form-data' 
-                },
-                // If you are using cookies for sessions:
-                withCredentials: true 
-            }
-        );
-        
-        return {
-            success: true,
-            data: response.data.user || response.data, // adjust based on your backend structure
-            message: response.data.message || "Profile updated successfully"
-        };
-    }
-    catch (err: any) {
-        // Log the actual error for debugging
-        console.error("Axios Update Error:", err.response?.data || err.message);
-        
-        return {
-            success: false,
-            message: err.response?.data?.message || err.message || "Profile update failed"
-        };
-    };
-}
-
-export const useLogout = () => {
-    const router = useRouter();
-
-    const logout = () => {
-        // 1. Clear Local Storage (Tokens/UI state)
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        // 2. Clear Cookies (This allows the Middleware to block access)
-        clearAuthCookies();
-
-
-        // 3. Redirect to Login
-        router.push("/login");
-        router.refresh(); // Forces Next.js to re-run middleware
-    };
-
-    return logout;
+  }
 };
 
-export const adminUpdateUser = async (id: string, formData: FormData) => {
-    const response = await axiosInstance.put(`${API.ADMIN.USERS}/${id}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" } // Overrides default for Multer
-    });
-    return response.data;
+/* --- AUTHENTICATION FLOWS --- */
+
+export const register = (registerData: any) => 
+  handleRequest(axiosInstance.post(API.AUTH.REGISTER, registerData), "Identity registration failed");
+
+export const login = (data: any) => 
+  handleRequest(axiosInstance.post(API.AUTH.LOGIN, data), "Authentication failed");
+
+export const whoami = () => 
+  handleRequest(axiosInstance.get(API.AUTH.WHOAMI), "Identity verification failed");
+
+export const requestPasswordReset = (email: string) => 
+  handleRequest(axiosInstance.post(API.AUTH.REQUEST_PASSWORD_RESET, { email }), "Recovery request failed");
+
+export const resetPassword = (token: string, newPassword: string) => {
+  const cleanToken = decodeURIComponent(token).replace(/^token=/, '');
+  return handleRequest(
+    axiosInstance.post(API.AUTH.RESET_PASSWORD(cleanToken), { newPassword }), 
+    "Key reset failed"
+  );
 };
+
+/* --- PROFILE & SOCIAL --- */
+
+export const updateProfile = (updateData: FormData) => 
+  handleRequest(
+    axiosInstance.put(API.AUTH.UPDATEPROFILE, updateData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    "Profile synchronization failed"
+  );
+
+export const getUserProfile = (userId: string) => 
+  handleRequest(axiosInstance.get(API.USERS.PROFILE(userId)), "Fetching profile failed");
+
+export const toggleFollow = (userId: string) => 
+  handleRequest(axiosInstance.post(API.USERS.FOLLOW(userId)), "Connection update failed");
+
+export const followUser = (userId: string) =>
+  handleRequest(axiosInstance.post(API.USERS.FOLLOW(userId)), "Follow action failed");
+
+export const unfollowUser = (userId: string) =>
+  handleRequest(axiosInstance.post(API.USERS.UNFOLLOW(userId)), "Unfollow action failed");
+
+/* --- ADMIN: USER MANAGEMENT --- */
+
+/**
+ * FETCH_ALL_USERS: Root access to identity database
+ */
+export const adminGetAllUsers = () => 
+  handleRequest(axiosInstance.get(API.ADMIN.USERS), "Failed to retrieve user directory");
+
+/**
+ * UPDATE_USER: Root modification of peer data
+ */
+export const adminUpdateUser = (id: string, formData: FormData) => 
+  handleRequest(
+    axiosInstance.put(`${API.ADMIN.USERS}/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    }), 
+    "Admin update failed"
+  );
+
+/**
+ * DELETE_USER: [2026-02-01] Protocol Compliance
+ * Permanent removal of identity from registry.
+ */
+export const adminDeleteUser = (id: string, adminPassword: string) => 
+  handleRequest(
+    axiosInstance.delete(`${API.ADMIN.USERS}/${id}`, {
+      data: { adminPassword }
+    }),
+    "Identity deletion protocol failed"
+  );
