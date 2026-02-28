@@ -207,7 +207,7 @@ export default function PickDetailsPage() {
   if (loading)
     return (
       <div className="p-20 text-[#D4FF33] font-mono animate-pulse">
-        SYNCHRONIZING_NODES...
+        Loading post...
       </div>
     );
   if (!pick) return null;
@@ -223,7 +223,7 @@ export default function PickDetailsPage() {
           className="group-hover:-translate-x-1 transition-transform"
         />
         <span className="text-[10px] font-black uppercase tracking-widest">
-          Return_to_Feed
+          Back to feed
         </span>
       </button>
 
@@ -237,7 +237,7 @@ export default function PickDetailsPage() {
         <div className="flex items-center gap-3 border-b border-white/5 pb-6">
           <MessageSquare className="text-[#D4FF33]" size={20} />
           <h3 className="text-xl font-black uppercase italic text-white tracking-tighter">
-            Thread_Signals ({pick.commentCount || 0})
+            Comments ({pick.commentCount || 0})
           </h3>
         </div>
 
@@ -247,13 +247,15 @@ export default function PickDetailsPage() {
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder={
-              isAuthenticated ? "Broadcast a signal..." : "AUTH_REQUIRED"
+              isAuthenticated ? "Write a comment..." : "Please log in to comment"
             }
             disabled={!isAuthenticated || submitting}
             className="w-full bg-white/[0.03] border border-white/10 rounded-[2rem] p-6 text-white focus:border-[#D4FF33]/50 focus:bg-white/[0.05] transition-all resize-none min-h-[140px] outline-none"
           />
           <button
             type="submit"
+            title="Post comment"
+            aria-label="Post comment"
             disabled={!newComment.trim() || submitting || !isAuthenticated}
             className="absolute bottom-4 right-4 p-4 bg-[#D4FF33] text-black rounded-2xl disabled:opacity-20 transition-all active:scale-90"
           >
@@ -351,12 +353,16 @@ export default function PickDetailsPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleUpdateComment(comment._id)}
+                            title="Save comment changes"
+                            aria-label="Save comment changes"
                             className="px-4 py-2 bg-[#D4FF33] text-black rounded-lg text-xs font-bold flex items-center gap-2 active:scale-95"
                           >
                             <Check size={14} strokeWidth={3} /> SAVE_CHANGES
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
+                            title="Cancel editing"
+                            aria-label="Cancel editing"
                             className="px-4 py-2 bg-white/5 text-zinc-400 rounded-lg text-xs font-bold hover:bg-white/10"
                           >
                             CANCEL

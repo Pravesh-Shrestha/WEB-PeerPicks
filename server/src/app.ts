@@ -116,7 +116,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 100,
-  skip: (req) => req.path === '/api/notifications/stream', // Don't limit the stream connection
+  skip: (req) =>
+    req.path === '/api/notifications/stream' ||
+    req.path === '/api/map/nearby',
   message: { success: false, message: "RATE_LIMIT_EXCEEDED" }
 });
 app.use('/api/', limiter);

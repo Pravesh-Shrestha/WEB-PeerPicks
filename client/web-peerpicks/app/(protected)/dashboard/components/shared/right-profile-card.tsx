@@ -9,6 +9,12 @@ export default function RightProfileCard() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
 
+  const handleLogout = async () => {
+    const confirmed = window.confirm("Are you sure you want to logout?");
+    if (!confirmed) return;
+    await logout();
+  };
+
   // Unified color variables for internal consistency
   const colors = {
     base: "#020203",
@@ -85,23 +91,21 @@ export default function RightProfileCard() {
         </button>
 
         <button 
-          onClick={logout}
+          onClick={handleLogout}
           className="w-full flex items-center justify-center gap-3 bg-white/[0.03] text-zinc-500 py-4.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border border-white/[0.05] hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all duration-300"
         >
           <LogOut size={14} /> Logout
         </button>
       </div>
 
-      {/* FOOTER STATS */}
-      <div className="mt-12 pt-8 border-t border-white/[0.05] w-full grid grid-cols-2 gap-4">
-          <div className="text-center border-r border-white/[0.05]">
-            <span className="block text-white text-base font-black italic">1.2k</span>
-            <span className="block text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em] mt-1">Picks</span>
-          </div>
-          <div className="text-center">
-            <span className="block text-[#D4FF33] text-base font-black italic">98%</span>
-            <span className="block text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em] mt-1">Trust</span>
-          </div>
+      {/* FOOTER LEGAL */}
+      <div className="mt-12 pt-8 border-t border-white/[0.05] w-full text-center space-y-2">
+        <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.15em]">
+          © {new Date().getFullYear()} PeerPicks. All rights reserved.
+        </p>
+        <p className="text-[8px] text-zinc-600 font-semibold uppercase tracking-[0.18em]">
+          PeerPicks™ is a trademark concept.
+        </p>
       </div>
     </div>
   );

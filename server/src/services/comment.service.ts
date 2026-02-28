@@ -2,7 +2,7 @@
 import { socialRepository } from "../repositories/social.repository";
 import Comment from "../models/comment.model";
 import Pick from "../models/pick.model";
-import { notificationRepository } from "../repositories/notification.repository";
+import { notificationService } from "./notification.service";
 import mongoose from "mongoose";
 
 export class CommentService {
@@ -19,17 +19,14 @@ async createComment(pickId: string, authorId: string, content: string) {
     // 3. Dispatch Notification Signal
     const parentPick = await Pick.findById(pickId);
     if (parentPick && parentPick.author && parentPick.author.toString() !== authorId) {
-    await notificationRepository.upsertSocialNotification(
-      { recipient: parentPick.author },
-      {
+      await notificationService.createNotification({
         recipient: parentPick.author,
         actor: authorId,
         type: 'COMMENT',
         pickId: pickId,
         message: `replied to your pick: "${parentPick.title}"`,
-      }
-    );
-  }
+      });
+    }
 
   return comment.populate('author', 'fullName profilePicture');
 }

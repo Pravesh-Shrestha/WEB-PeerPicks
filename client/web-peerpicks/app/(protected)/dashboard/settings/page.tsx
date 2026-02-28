@@ -6,7 +6,7 @@ import {
   Shield, MapPin, FolderOpen, FileText, 
   ChevronRight, Bell, Moon, Globe, Trash2, 
   ExternalLink, Fingerprint, Info, Check,
-  Zap, Database, Cpu
+  Zap, Database, Cpu, Lock, Eye, UserCheck, ScrollText
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/app/context/LanguageContext";
@@ -23,6 +23,10 @@ export default function SettingsPage() {
   const { lang, setLang, t } = useLanguage();
   const [locationAccess, setLocationAccess] = useState(true);
   const [fileAccess, setFileAccess] = useState(false);
+  const [notificationEmail, setNotificationEmail] = useState(true);
+  const [notificationPush, setNotificationPush] = useState(true);
+  const [profileVisibility, setProfileVisibility] = useState(true);
+  const [activityVisibility, setActivityVisibility] = useState(false);
 
   const handleLanguageSwitch = (id: any) => {
     setLang(id);
@@ -130,6 +134,86 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          {/* SECTION: PRIVACY CONTROLS */}
+          <section>
+            <div className="flex items-center gap-3 mb-8 ml-2">
+              <Lock size={14} className="text-[#D4FF33]" />
+              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.4em]">
+                Privacy & Visibility
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <PermissionTile
+                icon={Eye}
+                title="Public Profile"
+                desc="Allow others to view your profile"
+                active={profileVisibility}
+                onToggle={() => togglePermission("PROFILE_VISIBILITY", profileVisibility, setProfileVisibility)}
+              />
+              <PermissionTile
+                icon={UserCheck}
+                title="Show Activity"
+                desc="Display likes, follows and comments"
+                active={activityVisibility}
+                onToggle={() => togglePermission("ACTIVITY_VISIBILITY", activityVisibility, setActivityVisibility)}
+              />
+            </div>
+          </section>
+
+          {/* SECTION: NOTIFICATION PREFERENCES */}
+          <section>
+            <div className="flex items-center gap-3 mb-8 ml-2">
+              <Bell size={14} className="text-[#D4FF33]" />
+              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.4em]">
+                Notification Preferences
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <PermissionTile
+                icon={Bell}
+                title="Push Alerts"
+                desc="Receive in-app notification alerts"
+                active={notificationPush}
+                onToggle={() => togglePermission("PUSH_ALERTS", notificationPush, setNotificationPush)}
+              />
+              <PermissionTile
+                icon={FileText}
+                title="Email Alerts"
+                desc="Receive weekly activity summaries"
+                active={notificationEmail}
+                onToggle={() => togglePermission("EMAIL_ALERTS", notificationEmail, setNotificationEmail)}
+              />
+            </div>
+          </section>
+
+          {/* SECTION: LEGAL & COMPLIANCE */}
+          <section>
+            <div className="flex items-center gap-3 mb-8 ml-2">
+              <ScrollText size={14} className="text-[#D4FF33]" />
+              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.4em]">
+                Legal & Compliance
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              <LegalTile
+                icon={Shield}
+                title="Privacy Policy"
+                desc="How your data is collected, used and protected"
+              />
+              <LegalTile
+                icon={FileText}
+                title="Terms & Conditions"
+                desc="Rules for using PeerPicks services and content"
+              />
+              <LegalTile
+                icon={Lock}
+                title="Permissions & Data Access"
+                desc="Controls for camera, storage, location and notifications"
+              />
+            </div>
+          </section>
+
           {/* DELETE PROTOCOL [2026-02-01] */}
           <section className="pt-12">
             <button className="w-full p-2 bg-red-500/10 border border-red-500/20 rounded-[2.5rem] overflow-hidden group transition-all hover:border-red-500/40">
@@ -183,5 +267,27 @@ function PermissionTile({ icon: Icon, title, desc, active, onToggle }: any) {
         />
       </button>
     </div>
+  );
+}
+
+function LegalTile({ icon: Icon, title, desc }: any) {
+  return (
+    <button
+      type="button"
+      className="w-full p-6 bg-white/[0.02] border border-white/[0.05] rounded-[2rem] flex items-center justify-between text-left hover:bg-white/[0.04] hover:border-white/10 transition-all"
+      title={title}
+      aria-label={title}
+    >
+      <div className="flex items-center gap-5">
+        <div className="p-4 rounded-2xl bg-white/5 text-zinc-400">
+          <Icon size={20} strokeWidth={2.4} />
+        </div>
+        <div>
+          <p className="text-xs font-black uppercase tracking-tight text-white">{title}</p>
+          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider mt-1">{desc}</p>
+        </div>
+      </div>
+      <ChevronRight size={18} className="text-zinc-500" />
+    </button>
   );
 }

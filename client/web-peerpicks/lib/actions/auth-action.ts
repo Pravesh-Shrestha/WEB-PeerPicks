@@ -151,9 +151,9 @@ export const handleAdminUpdateUser = async (id: string, formData: FormData) => {
 /**
  * ADMIN_DELETE_PROTOCOL: [2026-02-01] Permanent removal of identity
  */
-export const handleAdminDeleteUser = async (id: string) => {
+export const handleAdminDeleteUser = async (id: string, adminPassword: string) => {
     try {
-        const result = await adminDeleteUser(id);
+        const result = await adminDeleteUser(id, adminPassword);
         if (result.success) {
             revalidatePath("/admin/users");
             return { success: true, message: "Identity deleted from registry" };

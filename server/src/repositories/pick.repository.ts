@@ -13,15 +13,24 @@ export const pickRepository = {
   /**
    * REVISED: Randomized Discovery Feed
    */
-  async getDiscoveryFeed(limit: number, skip: number, excludeIds: string[] = []) {
+  async getDiscoveryFeed(
+    limit: number,
+    skip: number,
+    excludeIds: string[] = [],
+    onlyUserIds: string[] = [],
+  ) {
+    const match: any = {
+      parentPick: null,
+      _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
+    };
+
+    if (onlyUserIds.length > 0) {
+      match.user = { $in: onlyUserIds.map((id) => new Types.ObjectId(id)) };
+    }
+
     return await Pick.aggregate([
       // 1. Filter only main posts (no replies)
-      { 
-        $match: { 
-          parentPick: null, 
-          _id: { $nin: excludeIds.map(id => new Types.ObjectId(id)) } 
-        } 
-      },
+      { $match: match },
 
       { $sample: { size: limit + skip } },
       { $skip: skip },

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Loader2, MessageCircle, Star, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useDashboard } from '@/app/context/DashboardContext';
 import { getDiscoveryFeed } from '@/lib/actions/pick-action'; 
 import { getMediaUrl } from '@/lib/utils';
@@ -56,6 +57,12 @@ export default function DiscoverPage() {
         <div className="max-w-[1400px] mx-auto space-y-6 px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <h1 className="text-xl font-black uppercase tracking-[0.3em] text-[#D4FF33]">Discover</h1>
+            <Link
+              href="/dashboard/nearby"
+              className="px-4 py-2 rounded-lg border border-[#D4FF33]/40 text-[#D4FF33] text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4FF33]/10 transition-all"
+            >
+              Nearby Picks
+            </Link>
             <div className="relative w-full max-w-lg group">
               {/* Icon set to white */}
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-white group-focus-within:text-[#D4FF33]" size={16} />

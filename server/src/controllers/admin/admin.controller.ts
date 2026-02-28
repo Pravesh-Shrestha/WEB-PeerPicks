@@ -106,6 +106,26 @@ export class AdminController {
   async deleteUser(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const { adminPassword } = req.body as { adminPassword?: string };
+
+      if (!req.user?._id) {
+        throw new HttpError(401, "Authentication required");
+      }
+
+      if (!adminPassword || adminPassword.trim().length === 0) {
+        throw new HttpError(400, "Admin password is required to delete an account");
+      }
+
+      const admin = await UserModel.findById(req.user._id).select("password");
+      if (!admin) {
+        throw new HttpError(401, "Admin account not found");
+      }
+
+      const isPasswordValid = await bcrypt.compare(adminPassword, admin.password);
+      if (!isPasswordValid) {
+        throw new HttpError(401, "Invalid admin password");
+      }
+
       const deletedUser = await userRepository.deleteUser(id);
 
       if (!deletedUser) throw new HttpError(404, "User not found");

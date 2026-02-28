@@ -47,7 +47,7 @@ export default function NotificationsPage() {
         <div className="absolute inset-0 bg-[#D4FF33]/20 blur-lg rounded-full animate-ping" />
       </div>
       <p className="text-[10px] text-[#D4FF33] font-mono uppercase tracking-[0.5em]">
-        Syncing_Neural_Feed...
+        Loading notifications...
       </p>
     </div>
   );
@@ -66,21 +66,23 @@ export default function NotificationsPage() {
                 )}
               </div>
               <h1 className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none">
-                Signal_Feed
+                Notifications
               </h1>
             </div>
             <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] pl-10">
-              Encrypted Data Inbound // {signals.length} Active Nodes
+              {signals.length} total notifications
             </p>
           </div>
 
           {signals.length > 0 && (
             <button 
               onClick={onMarkAllRead}
+              title="Mark all as read"
+              aria-label="Mark all as read"
               className="group flex items-center gap-2 text-[9px] font-black uppercase tracking-tighter py-3 px-6 rounded-xl bg-white/5 border border-white/10 hover:border-[#D4FF33] hover:text-[#D4FF33] transition-all duration-500"
             >
               <CheckCheck size={14} className="group-hover:scale-110 transition-transform" /> 
-              Clear_All_Sync
+              Mark all read
             </button>
           )}
         </div>
@@ -104,7 +106,7 @@ export default function NotificationsPage() {
                 </div>
                 <h3 className="text-white font-bold uppercase tracking-tighter mb-1 text-lg">Silence_Detected</h3>
                 <p className="text-[9px] font-mono uppercase tracking-[0.4em] text-zinc-600">
-                  Neural memory modules are currently offline
+                  No notifications yet
                 </p>
               </motion.div>
             ) : (
@@ -147,7 +149,7 @@ export default function NotificationsPage() {
         <div className="pt-10 pl-10">
           <p className="text-[8px] font-mono text-zinc-700 uppercase tracking-[0.5em] flex items-center gap-4">
             <span className="w-8 h-[1px] bg-zinc-800" />
-            End of Signal Stream // Protocol Active [2026-02-01]
+            End of notifications
           </p>
         </div>
       )}

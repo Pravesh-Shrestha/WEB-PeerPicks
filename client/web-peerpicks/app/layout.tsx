@@ -3,6 +3,7 @@ import { Inter, Archivo } from "next/font/google"; // Professional Font Pairing
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import { LanguageProvider } from "./context/LanguageContext"; 
+import { NotificationProvider } from "./context/NotificationContext";
 import { Toaster } from 'sonner';
 
 // Load Inter for clean, professional body text
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased bg-[#09090B] font-sans text-zinc-300" suppressHydrationWarning={true}>
         <LanguageProvider>
           <AuthProvider>
-            {children}
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
             
             {/* Optimized Global Toast Manager with Professional Typography */}
             <Toaster 

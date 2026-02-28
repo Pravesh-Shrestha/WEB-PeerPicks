@@ -41,7 +41,14 @@ export default function UsersPage() {
   const onDelete = async (userId: string) => {
     // Verified: Terminology updated to "Delete" as requested
     if (confirm("IDENTITY_DELETION_CONFIRM: Permanent removal of identity? This action cannot be undone.")) {
-      const result = await handleAdminDeleteUser(userId);
+      const adminPassword = prompt("Enter your admin password to confirm deletion:");
+
+      if (!adminPassword || adminPassword.trim().length === 0) {
+        toast.error("Admin password is required to delete an account");
+        return;
+      }
+
+      const result = await handleAdminDeleteUser(userId, adminPassword);
       if (result.success) {
         toast.success("Identity_Deleted_From_Registry");
         fetchUsers(); 

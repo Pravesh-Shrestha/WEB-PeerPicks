@@ -52,26 +52,72 @@ export const socialController = {
   /**
    * TOGGLE FOLLOW: Connection logic between user nodes.
    */
-  toggleFollow: async (req: Request, res: Response) => {
+  followUser: async (req: Request, res: Response) => {
     try {
       const { targetUserId } = req.params;
       const followerId = (req as any).user._id; // FIX: Use _id
 
+      if (followerId.toString() === targetUserId.toString()) {
+        return res.status(400).json({ success: false, message: "You cannot follow yourself." });
+      }
+
       const isFollowing = await userRepo.isFollowing(followerId, targetUserId);
 
       if (isFollowing) {
-        // [2026-02-01] Protocol Compliance: Delete the connection
-        await userRepo.unfollow(followerId, targetUserId);
-      } else {
-        await userRepo.follow(followerId, targetUserId);
-        await notificationService.createNotification({
-          recipient: targetUserId,
-          actor: followerId.toString(),
-          type: "FOLLOW",
-        });
+        return res.status(200).json({ success: true, isFollowing: true });
       }
 
-      return res.status(200).json({ success: true, isFollowing: !isFollowing });
+      await userRepo.follow(followerId, targetUserId);
+      await notificationService.createNotification({
+        recipient: targetUserId,
+        actor: followerId.toString(),
+        type: "FOLLOW",
+      });
+
+      return res.status(200).json({ success: true, isFollowing: true });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: "Follow action failed." });
+    }
+  },
+
+  unfollowUser: async (req: Request, res: Response) => {
+    try {
+      const { targetUserId } = req.params;
+      const followerId = (req as any).user._id;
+
+      const isFollowing = await userRepo.isFollowing(followerId, targetUserId);
+
+      if (!isFollowing) {
+        return res.status(200).json({ success: true, isFollowing: false });
+      }
+
+      await userRepo.unfollow(followerId, targetUserId);
+      return res.status(200).json({ success: true, isFollowing: false });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: "Unfollow action failed." });
+    }
+  },
+
+  toggleFollow: async (req: Request, res: Response) => {
+    try {
+      const { targetUserId } = req.params;
+      const followerId = (req as any).user._id;
+
+      const isFollowing = await userRepo.isFollowing(followerId, targetUserId);
+
+      if (isFollowing) {
+        await userRepo.unfollow(followerId, targetUserId);
+        return res.status(200).json({ success: true, isFollowing: false });
+      }
+
+      await userRepo.follow(followerId, targetUserId);
+      await notificationService.createNotification({
+        recipient: targetUserId,
+        actor: followerId.toString(),
+        type: "FOLLOW",
+      });
+
+      return res.status(200).json({ success: true, isFollowing: true });
     } catch (error) {
       return res.status(500).json({ success: false, message: "Connection toggle failed." });
     }
@@ -97,7 +143,7 @@ export const socialController = {
         await notificationService.createNotification({
           recipient: recipientId,
           actor: userId.toString(),
-          type: "VOTE", 
+          type: "SAVE", 
           pickId: pickId,
         });
       }

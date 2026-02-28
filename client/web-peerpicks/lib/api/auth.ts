@@ -61,6 +61,12 @@ export const getUserProfile = (userId: string) =>
 export const toggleFollow = (userId: string) => 
   handleRequest(axiosInstance.post(API.USERS.FOLLOW(userId)), "Connection update failed");
 
+export const followUser = (userId: string) =>
+  handleRequest(axiosInstance.post(API.USERS.FOLLOW(userId)), "Follow action failed");
+
+export const unfollowUser = (userId: string) =>
+  handleRequest(axiosInstance.post(API.USERS.UNFOLLOW(userId)), "Unfollow action failed");
+
 /* --- ADMIN: USER MANAGEMENT --- */
 
 /**
@@ -84,8 +90,10 @@ export const adminUpdateUser = (id: string, formData: FormData) =>
  * DELETE_USER: [2026-02-01] Protocol Compliance
  * Permanent removal of identity from registry.
  */
-export const adminDeleteUser = (id: string) => 
+export const adminDeleteUser = (id: string, adminPassword: string) => 
   handleRequest(
-    axiosInstance.delete(`${API.ADMIN.USERS}/${id}`),
+    axiosInstance.delete(`${API.ADMIN.USERS}/${id}`, {
+      data: { adminPassword }
+    }),
     "Identity deletion protocol failed"
   );

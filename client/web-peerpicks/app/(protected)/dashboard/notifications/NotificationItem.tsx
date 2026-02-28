@@ -45,10 +45,10 @@ export const NotificationItem = ({
   };
 
   const getActorLabel = () => {
-    if (n.type === "SYSTEM") return "SYSTEM_NODE";
-    if (n.type === "WELCOME") return "PEERPICKS_TEAM";
+    if (n.type === "SYSTEM") return "System";
+    if (n.type === "WELCOME") return "PeerPicks";
     // Uses the 'actorName' provided by your repository's fallback logic
-    return n.actor?.fullName || n.actorName || "UNKNOWN_PEER";
+    return n.actor?.fullName || n.actorName || "Someone";
   };
 
   const getContent = () => {
@@ -61,7 +61,7 @@ export const NotificationItem = ({
       case "COMMENT": return "broadcasted a new signal on your pick.";
       case "FOLLOW": return "started following you.";
       case "SAVE": return "favorited your pick.";
-      case "WELCOME": return "Welcome to the node. Signal active.";
+      case "WELCOME": return "Welcome to PeerPicks.";
       default: return "New signal established.";
     }
   };
@@ -100,6 +100,7 @@ export const NotificationItem = ({
       {/* 2. Text Content - Interactive Area */}
       <div 
         onClick={handleSignalClick} 
+        title={n.pickId ? "Open related post" : "Notification"}
         className="flex-1 cursor-pointer group/text"
       >
         <div className="flex flex-col">
@@ -118,7 +119,7 @@ export const NotificationItem = ({
             </span>
             <span className="w-1 h-1 rounded-full bg-zinc-800" />
             <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
-              NODE_SYNC
+              Notification
             </span>
             {n.pickId && (
               <span className="flex items-center gap-1 text-[9px] font-black text-[#D4FF33] opacity-0 group-hover/text:opacity-100 transition-opacity uppercase ml-2">
@@ -136,8 +137,9 @@ export const NotificationItem = ({
             e.stopPropagation();
             onDelete(n._id, !n.read);
           }}
+          aria-label="Delete notification"
           className="p-3 text-zinc-800 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
-          title="Delete Signal"
+          title="Delete notification"
         >
           <Trash2 size={18} strokeWidth={2.5} />
         </button>

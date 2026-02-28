@@ -105,7 +105,7 @@ export const PickCard = ({
   const onShareClick = () => {
     const url = `${window.location.origin}/dashboard/picks/${pick._id}`;
     navigator.clipboard.writeText(url);
-    toast.info("LINK_COPIED", { description: "Signal shared to clipboard." });
+    toast.info("Link copied", { description: "You can now share this post." });
   };
 
   const onUpdatePick = async () => {
@@ -131,7 +131,7 @@ export const PickCard = ({
   };
 
   const onVoteClick = async () => {
-    if (!currentId) return toast.error("AUTH_REQUIRED");
+    if (!currentId) return toast.error("Please log in to vote");
     const isUpvoted = voteStatus === "up";
     setVoteStatus(isUpvoted ? null : "up");
     setVoteCount((prev: number) => (isUpvoted ? prev - 1 : prev + 1));
@@ -277,6 +277,8 @@ export const PickCard = ({
                 <div className="relative">
                   <button 
                     onClick={() => setShowTray(!showTray)}
+                        title="More actions"
+                        aria-label="More actions"
                     className={`p-1.5 rounded-md transition-colors ${showTray ? "text-[#D4FF33] bg-white/5" : "text-zinc-500 hover:text-white"}`}
                   >
                     <MoreVertical size={16} />
@@ -293,12 +295,16 @@ export const PickCard = ({
                         >
                           <button 
                             onClick={() => { setIsEditing(true); setShowTray(false); }}
+                            title="Edit post"
+                            aria-label="Edit post"
                             className="w-full flex items-center gap-2 px-2 py-1.5 text-[9px] font-bold text-zinc-400 hover:text-[#D4FF33] hover:bg-white/5 rounded-lg transition-all uppercase tracking-widest"
                           >
                             <Edit3 size={12} /> Edit
                           </button>
                           <button 
                             onClick={() => { onDeleteClick(); setShowTray(false); }}
+                            title="Delete post"
+                            aria-label="Delete post"
                             className="w-full flex items-center gap-2 px-2 py-1.5 text-[9px] font-bold text-red-400 hover:text-red-500 hover:bg-red-500/5 rounded-lg transition-all uppercase tracking-widest"
                           >
                             <Trash2 size={12} /> Delete
@@ -323,8 +329,8 @@ export const PickCard = ({
             
             {!isFullscreen && mediaFiles.length > 1 && (
               <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between opacity-0 group-hover/media:opacity-100 transition-opacity pointer-events-none z-20">
-                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto"><ChevronLeft size={16} /></button>
-                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto"><ChevronRight size={16} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto" title="Previous media" aria-label="Previous media"><ChevronLeft size={16} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-[#D4FF33] hover:text-black pointer-events-auto" title="Next media" aria-label="Next media"><ChevronRight size={16} /></button>
               </div>
             )}
             {!isFullscreen && (
@@ -360,16 +366,16 @@ export const PickCard = ({
             )}
 
             <div className="grid grid-cols-4 gap-1.5 pt-3 border-t border-white/5">
-              <button onClick={onVoteClick} className={`flex items-center justify-center gap-1 py-2 rounded-lg border transition-all ${voteStatus === "up" ? "bg-[#D4FF33] border-[#D4FF33] text-black" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
+              <button onClick={onVoteClick} title="Upvote" aria-label="Upvote" className={`flex items-center justify-center gap-1 py-2 rounded-lg border transition-all ${voteStatus === "up" ? "bg-[#D4FF33] border-[#D4FF33] text-black" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
                 <ChevronUp size={16} strokeWidth={3} /><span className="text-[10px] font-bold font-mono">{voteCount}</span>
               </button>
-              <button onClick={onToggleSave} className={`flex items-center justify-center py-2 rounded-lg border transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/20 text-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.1)]" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
+              <button onClick={onToggleSave} title={isFavorited ? "Remove from favorites" : "Save to favorites"} aria-label={isFavorited ? "Remove from favorites" : "Save to favorites"} className={`flex items-center justify-center py-2 rounded-lg border transition-all ${isFavorited ? "bg-pink-500/10 border-pink-500/20 text-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.1)]" : "bg-white/5 border-white/5 text-zinc-400 hover:text-white"}`}>
                 <Heart size={16} className={isFavorited ? "fill-pink-500" : ""} />
               </button>
-              <button onClick={() => router.push(`/dashboard/picks/${pick._id}`)} className="flex items-center justify-center py-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
+              <button onClick={() => router.push(`/dashboard/picks/${pick._id}`)} title="Open comments" aria-label="Open comments" className="flex items-center justify-center py-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
                 <MessageCircle size={16} />
               </button>
-              <button onClick={onShareClick} className="flex items-center justify-center py-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
+              <button onClick={onShareClick} title="Copy share link" aria-label="Copy share link" className="flex items-center justify-center py-2 rounded-lg bg-white/5 border border-white/5 text-zinc-400 hover:text-[#D4FF33] transition-all">
                 <Share2 size={16} />
               </button>
             </div>
@@ -390,6 +396,8 @@ export const PickCard = ({
             
             <button 
               onClick={() => setIsFullscreen(false)} 
+              title="Close full screen"
+              aria-label="Close full screen"
               className="absolute top-6 right-6 z-[1000001] text-white p-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full hover:bg-red-600 transition-all pointer-events-auto"
             >
               <X size={24} />
@@ -398,8 +406,8 @@ export const PickCard = ({
             <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
               {mediaFiles.length > 1 && (
                 <>
-                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} className="absolute left-4 z-[1000001] p-4 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronLeft size={32} /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} className="absolute right-4 z-[1000001] p-4 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronRight size={32} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + mediaFiles.length) % mediaFiles.length); }} title="Previous media" aria-label="Previous media" className="absolute left-4 z-[1000001] p-4 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronLeft size={32} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % mediaFiles.length); }} title="Next media" aria-label="Next media" className="absolute right-4 z-[1000001] p-4 bg-white/5 hover:bg-white/10 rounded-full text-white pointer-events-auto backdrop-blur-md transition-all"><ChevronRight size={32} /></button>
                 </>
               )}
               

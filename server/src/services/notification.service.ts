@@ -72,6 +72,7 @@ export const notificationService = {
       VOTE: 'success',
       COMMENT: 'info',
       SAVE: 'warning',
+      FOLLOW: 'success',
       WELCOME: 'success',
       SYSTEM: 'info'
     };

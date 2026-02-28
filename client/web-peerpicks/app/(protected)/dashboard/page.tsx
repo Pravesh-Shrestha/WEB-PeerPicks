@@ -28,7 +28,8 @@ export default function DashboardPage() {
     
     try {
       // Pass the activeTab to your action if your backend supports it
-      const result = await getDiscoveryFeed(1, 10); 
+      const feedType = activeTab === 'following' ? 'following' : 'new';
+      const result = await getDiscoveryFeed(1, 10, feedType); 
       
       if (result?.success && Array.isArray(result.data)) {
         setPicks(result.data); 
@@ -42,7 +43,7 @@ export default function DashboardPage() {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [authLoading, isAuthenticated]); // Dependencies are now stable
+  }, [authLoading, isAuthenticated, activeTab]); // Dependencies are now stable
 
   // 2. Controlled Effect Loop
   useEffect(() => {

@@ -2,8 +2,55 @@ import { Request, Response } from "express";
 import { pickService } from "../services/pick.service";
 import { HttpError } from "../errors/http-error";
 import { UserRepository } from "../repositories/user.repository";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../config";
 
 const userRepo = new UserRepository(); // Create an instance
+
+const resolveUserIdFromRequest = (req: Request): string | undefined => {
+  const userFromMiddleware = (req.user as any)?._id?.toString();
+  if (userFromMiddleware) return userFromMiddleware;
+
+  const authHeader = req.headers.authorization;
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  }
+
+  if (!token) {
+    const rawCookie = req.headers.cookie || "";
+    const cookies = Object.fromEntries(
+      rawCookie
+        .split(";")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => {
+          const index = entry.indexOf("=");
+          return index === -1
+            ? [entry, ""]
+            : [entry.slice(0, index), decodeURIComponent(entry.slice(index + 1))];
+        }),
+    ) as Record<string, string>;
+
+    token =
+      cookies.auth_token ||
+      cookies.token ||
+      cookies.access_token ||
+      cookies.jwt;
+  }
+
+  if (!token || token === "null" || token === "undefined") {
+    return undefined;
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as Record<string, any>;
+    return (decoded.id || decoded._id || decoded.sub)?.toString();
+  } catch {
+    return undefined;
+  }
+};
 
 export const pickController = {
   /**
@@ -46,14 +93,16 @@ export const pickController = {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
+      const feedType = (req.query.type as "new" | "following") || "new";
 
       // Extract userId if available (optional for public feeds)
-      const currentUserId = (req.user as any)?._id;
+      const currentUserId = resolveUserIdFromRequest(req);
 
       const feed = await pickService.getDiscoveryFeed(
         page,
         limit,
         currentUserId,
+        feedType,
       );
       res.status(200).json({ success: true, data: feed });
     } catch (error: any) {

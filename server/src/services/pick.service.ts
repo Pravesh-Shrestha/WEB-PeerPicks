@@ -132,9 +132,23 @@ export const pickService = {
   /**
    * READ: Discovery Feed with interaction status
    */
-  async getDiscoveryFeed(page: number, limit: number, currentUserId?: string) {
+  async getDiscoveryFeed(
+    page: number,
+    limit: number,
+    currentUserId?: string,
+    feedType: "new" | "following" = "new",
+  ) {
     const skip = (page - 1) * limit;
-    const picks = await pickRepository.getDiscoveryFeed(limit, skip);
+    let onlyUserIds: string[] = [];
+
+    if (feedType === "following" && currentUserId) {
+      onlyUserIds = await userRepo.getFollowingIds(currentUserId);
+      if (onlyUserIds.length === 0) {
+        return [];
+      }
+    }
+
+    const picks = await pickRepository.getDiscoveryFeed(limit, skip, [], onlyUserIds);
     return await hydratePicks(picks, currentUserId);
   },
 

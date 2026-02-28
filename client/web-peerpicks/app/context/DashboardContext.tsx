@@ -50,6 +50,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setUnreadCount(res.count);
       }
     } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 429) return;
       console.error("[SIGNAL_SYNC_ERROR]: Dashboard handshake failed.");
     }
   }, [isAuthenticated]);

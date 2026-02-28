@@ -25,7 +25,16 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
             token = authHeader.split(" ")[1];
         }
 
-        // 2. Fallback to cookie token
+        // 2. Fallback for SSE/EventSource where custom headers are limited
+        const queryToken = req.query?.token;
+        if (!token && typeof queryToken === "string") {
+            const trimmed = queryToken.trim();
+            if (trimmed && trimmed !== "null" && trimmed !== "undefined") {
+                token = trimmed;
+            }
+        }
+
+        // 3. Fallback to cookie token
         if (!token) {
             const rawCookie = req.headers.cookie || "";
             const cookies = Object.fromEntries(
@@ -50,7 +59,7 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
             throw new HttpError(401, "Authorization token missing or malformed");
         }
 
-        // 2. Token Verification
+        // 4. Token Verification
         const decoded = jwt.verify(token, JWT_SECRET) as Record<string, any>;
         if (!decoded || !decoded.id) throw new HttpError(401, "Invalid token");
 
@@ -59,7 +68,7 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
             throw new HttpError(401, "Invalid signal payload: No identifier found");
         }
 
-        // 3. Database Sync: Verify user hasn't been DELETED [2026-02-01]
+        // 5. Database Sync: Verify user hasn't been DELETED [2026-02-01]
         // VETERAN MOVE: Using .lean() in the repository makes this lookup much lighter
         const user = await userRepository.getUserById(userId.toString());
         
@@ -67,7 +76,7 @@ export async function authorizedMiddleware(req: Request, res: Response, next: Ne
             throw new HttpError(401, "Handshake failed: User account no longer exists");
         }
 
-        // 4. Identity Attachment
+        // 6. Identity Attachment
         req.user = user;
         
         return next();

@@ -47,7 +47,8 @@ export default function FeedContent({ type }: FeedProps) {
     const currentPage = isInitial ? 1 : page;
     
     try {
-      const result = await getDiscoveryFeed(currentPage, 10);
+      const mappedType = type === "following" ? "following" : "new";
+      const result = await getDiscoveryFeed(currentPage, 10, mappedType);
       const newPosts = result?.data || (Array.isArray(result) ? result : []);
 
       if (newPosts.length === 0) {
@@ -67,7 +68,7 @@ export default function FeedContent({ type }: FeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, type]);
 
   // 3. INFINITE SCROLL OBSERVER (With Loading Guard)
   useEffect(() => {

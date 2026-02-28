@@ -11,7 +11,7 @@ export interface INotification extends Document {
   recipient: Types.ObjectId;
   // UPDATE: Allow actor to be the ID or the populated object
   actor: Types.ObjectId | IPopulatedActor; 
-  type: 'VOTE' | 'COMMENT' | 'SAVE' | 'WELCOME' | 'SYSTEM';
+  type: 'VOTE' | 'COMMENT' | 'SAVE' | 'FOLLOW' | 'WELCOME' | 'SYSTEM';
   status: 'success' | 'error' | 'info' | 'warning';
   pickId?: Types.ObjectId | any; // Allow for populated pick details
   message?: string;
@@ -23,7 +23,7 @@ export interface INotification extends Document {
 const notificationSchema = new Schema<INotification>({
   recipient: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   actor: { type: Schema.Types.ObjectId, ref: 'User', required: false },
-  type: { type: String, enum: ['VOTE', 'COMMENT', 'SAVE', 'WELCOME', 'SYSTEM'], required: true },
+  type: { type: String, enum: ['VOTE', 'COMMENT', 'SAVE', 'FOLLOW', 'WELCOME', 'SYSTEM'], required: true },
   status: { type: String, enum: ['success', 'error', 'info', 'warning'], default: 'info' },
   pickId: { type: Schema.Types.ObjectId, ref: 'Pick', required: false, index: true },
   message: { type: String, required: false },

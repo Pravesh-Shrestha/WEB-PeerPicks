@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, Bell, Heart, Settings } from "lucide-react";
+import { Home, LayoutGrid, Bell, Heart, Settings, MapPin } from "lucide-react";
 import { useDashboard } from "@/app/context/DashboardContext";
 import { useLanguage } from "@/app/context/LanguageContext";
 
@@ -16,6 +16,7 @@ interface SidebarProps {
 const navigation = [
   { id: "home", href: "/dashboard", icon: Home },
   { id: "discover", href: "/dashboard/discover", icon: LayoutGrid },
+  { id: "nearby", href: "/dashboard/nearby", icon: MapPin },
   { id: "notifications", href: "/dashboard/notifications", icon: Bell },
   { id: "favorites", href: "/dashboard/favorites", icon: Heart },
   { id: "settings", href: "/dashboard/settings", icon: Settings },
@@ -45,6 +46,8 @@ export default function Sidebar({ onOpenCreate }: SidebarProps) {
             <Link
               key={item.id}
               href={item.href}
+              title={t(`nav.${item.id}`)}
+              aria-label={t(`nav.${item.id}`)}
               className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 relative ${
                 isActive
                   ? "bg-[#D4FF33] text-black shadow-[0_10px_30px_-10px_rgba(212,255,51,0.3)]"

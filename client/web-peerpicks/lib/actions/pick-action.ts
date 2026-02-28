@@ -7,11 +7,12 @@ import axiosInstance from "../api/axios";
 export const getDiscoveryFeed = async (
   page: number = 1,
   limit: number = 10,
+  type: "new" | "following" = "new",
 ) => {
   try {
     // Result is the body: { success: true, data: [...] }
     const result: any = await axiosInstance.get(API.PICKS.FEED, {
-      params: { page, limit },
+      params: { page, limit, type },
     });
     return result;
   } catch (error) {

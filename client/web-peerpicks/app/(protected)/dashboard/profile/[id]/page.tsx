@@ -4,18 +4,24 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import axiosInstance from "@/lib/api/axios";
 import { API } from "@/lib/api/endpoints";
+import { followUser, unfollowUser } from "@/lib/api/auth";
 import { PickCard } from "../../components/shared/pick-card";
 import { getMediaUrl } from "@/lib/utils";
 import { MapPin, Calendar, ShieldCheck, Loader2, Quote, User as UserIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/app/context/AuthContext";
+import { toast } from "sonner";
 
 export default function UserProfilePage() {
   const params = useParams();
   const userId = params?.id as string;
+  const { user: currentUser } = useAuth();
 
   const [user, setUser] = useState<any>(null);
   const [picks, setPicks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isUpdatingFollow, setIsUpdatingFollow] = useState(false);
 
   // RANDOM_QUOTES: Refreshed on every visit
   const randomQuote = useMemo(() => {
@@ -37,8 +43,10 @@ export default function UserProfilePage() {
       try {
         setLoading(true);
         const res = await axiosInstance.get(API.PICKS.USER_PICKS(userId));
-        setUser(res?.data?.profile || null);
+        const profile = res?.data?.profile || null;
+        setUser(profile);
         setPicks(res?.data?.picks || []);
+        setIsFollowing(!!profile?.isFollowing);
       } catch (error) {
         console.error("Failed to fetch user profile:", error);
       } finally {
@@ -64,6 +72,39 @@ export default function UserProfilePage() {
       </div>
     );
   }
+
+  const currentUserId = currentUser?._id || currentUser?.id;
+  const isOwnProfile = !!currentUserId && currentUserId.toString() === (user?._id || user?.id || "").toString();
+
+  const handleFollowToggle = async () => {
+    if (isUpdatingFollow || isOwnProfile) return;
+
+    const nextValue = !isFollowing;
+    const previousCount = user?.followerCount || 0;
+
+    setIsUpdatingFollow(true);
+    setIsFollowing(nextValue);
+    setUser((prev: any) => ({
+      ...prev,
+      followerCount: Math.max(0, previousCount + (nextValue ? 1 : -1)),
+    }));
+
+    try {
+      const response = nextValue
+        ? await followUser(userId)
+        : await unfollowUser(userId);
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Follow update failed");
+      }
+    } catch (error: any) {
+      setIsFollowing(!nextValue);
+      setUser((prev: any) => ({ ...prev, followerCount: previousCount }));
+      toast.error(error?.message || "Could not update follow status");
+    } finally {
+      setIsUpdatingFollow(false);
+    }
+  };
 
   // Format full name for the handle (lowercase, no spaces)
   const formattedHandle = user.fullName?.toLowerCase().replace(/\s+/g, '_') || "unnamed";
@@ -99,6 +140,22 @@ export default function UserProfilePage() {
             <p className="text-[#D4FF33] font-mono text-sm uppercase tracking-[0.3em] mt-2 font-bold">
               USER @{formattedHandle}
             </p>
+
+            {!isOwnProfile && (
+              <button
+                onClick={handleFollowToggle}
+                disabled={isUpdatingFollow}
+                title={isFollowing ? "Unfollow this user" : "Follow this user"}
+                aria-label={isFollowing ? "Unfollow this user" : "Follow this user"}
+                className={`mt-4 px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                  isFollowing
+                    ? "bg-white/10 border border-white/20 text-white hover:bg-white/20"
+                    : "bg-[#D4FF33] text-black hover:brightness-95"
+                } disabled:opacity-60`}
+              >
+                {isUpdatingFollow ? "Updating..." : isFollowing ? "Following" : "Follow"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -130,11 +187,11 @@ export default function UserProfilePage() {
           <div className="flex gap-4">
             <div className="flex-1 bg-white text-black rounded-2xl p-6 text-center">
               <div className="text-4xl font-black">{picks.length}</div>
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] mt-1">Total_Picks</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] mt-1">Posts</div>
             </div>
             <div className="flex-1 bg-[#D4FF33] text-black rounded-2xl p-6 text-center">
-              <div className="text-4xl font-black">{user.reputation || 0}</div>
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] mt-1">Reputation</div>
+              <div className="text-4xl font-black">{user.followerCount || 0}</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] mt-1">Followers</div>
             </div>
           </div>
         </div>
@@ -142,7 +199,7 @@ export default function UserProfilePage() {
         {/* SECTION DIVIDER */}
         <div className="flex items-center gap-6 mb-10">
            <h2 className="text-base font-black uppercase tracking-[0.4em] text-white whitespace-nowrap">
-             Recent_Posts
+             Recent posts
            </h2>
            <div className="h-[2px] flex-1 bg-white/20" />
         </div>

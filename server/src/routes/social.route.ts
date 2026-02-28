@@ -9,8 +9,8 @@ const router = Router();
  * 1. CONNECTIONS
  * Handles follower/following logic.
  */
-router.post("/follow/:targetUserId", authorizedMiddleware, socialController.toggleFollow);
-router.post("/unfollow/:targetUserId", authorizedMiddleware, socialController.toggleFollow); 
+router.post("/follow/:targetUserId", authorizedMiddleware, socialController.followUser);
+router.post("/unfollow/:targetUserId", authorizedMiddleware, socialController.unfollowUser); 
 
 /**
  * 2. CONSENSUS (VOTING)

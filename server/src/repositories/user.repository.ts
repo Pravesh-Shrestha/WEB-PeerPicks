@@ -11,6 +11,7 @@ export interface IUserRepository {
   follow(followerId: string, targetId: string): Promise<void>;
   unfollow(followerId: string, targetId: string): Promise<void>;
   isFollowing(followerId: string, targetId: string): Promise<boolean>;
+  getFollowingIds(userId: string): Promise<string[]>;
 }
 
 export class UserRepository implements IUserRepository {
@@ -68,29 +69,51 @@ export class UserRepository implements IUserRepository {
     targetId: string, 
     isFollow: boolean
   ): Promise<void> {
+    const operator = isFollow ? '$addToSet' : '$pull';
+    const increment = isFollow ? 1 : -1;
+
+    const followerUpdate = {
+      [operator]: { following: targetId },
+      $inc: { followingCount: increment },
+    };
+
+    const targetUpdate = {
+      [operator]: { followers: followerId },
+      $inc: { followerCount: increment },
+    };
+
+    const applyWithoutTransaction = async () => {
+      await Promise.all([
+        UserModel.findByIdAndUpdate(followerId, followerUpdate),
+        UserModel.findByIdAndUpdate(targetId, targetUpdate),
+      ]);
+    };
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      const operator = isFollow ? '$addToSet' : '$pull';
-      const increment = isFollow ? 1 : -1;
+      await Promise.all([
+        UserModel.findByIdAndUpdate(followerId, followerUpdate, { session }),
+        UserModel.findByIdAndUpdate(targetId, targetUpdate, { session }),
+      ]);
 
-      // Update Follower: Modify 'following' list and count
-      const updateFollower = UserModel.findByIdAndUpdate(followerId, {
-        [operator]: { following: targetId },
-        $inc: { followingCount: increment }
-      }, { session });
-
-      // Update Target: Modify 'followers' list and count
-      const updateTarget = UserModel.findByIdAndUpdate(targetId, {
-        [operator]: { followers: followerId },
-        $inc: { followerCount: increment }
-      }, { session });
-
-      await Promise.all([updateFollower, updateTarget]);
       await session.commitTransaction();
-    } catch (error) {
+    } catch (error: any) {
       await session.abortTransaction();
+
+      const message = `${error?.message || ""}`;
+      const code = error?.code;
+      const isStandaloneTransactionError =
+        message.includes("Transaction numbers are only allowed on a replica set member") ||
+        message.includes("Transaction not supported") ||
+        code === 20;
+
+      if (isStandaloneTransactionError) {
+        await applyWithoutTransaction();
+        return;
+      }
+
       throw error;
     } finally {
       session.endSession();
@@ -112,5 +135,11 @@ export class UserRepository implements IUserRepository {
       following: targetId 
     });
     return count > 0;
+  }
+
+  async getFollowingIds(userId: string): Promise<string[]> {
+    const user = await UserModel.findById(userId).select('following').lean();
+    if (!user?.following?.length) return [];
+    return user.following.map((id: any) => id.toString());
   }
 }
