@@ -46,9 +46,12 @@ export class AdminController {
         profilePicture: parsed.data.profilePicture ?? undefined,
       };
 
-      // 3. Handle file upload if present
+      // 3. Handle file upload if present (Cloudinary-backed URL)
       if (req.file) {
-        userData.profilePicture = `/uploads/${req.file.filename}`;
+        const uploadedUrl = (req.file as any).path || (req.file as any).secure_url;
+        if (uploadedUrl) {
+          userData.profilePicture = uploadedUrl;
+        }
       }
 
       const user = await userRepository.create(userData as any);
@@ -86,7 +89,10 @@ export class AdminController {
       }
 
       if (req.file) {
-        updatePayload.profilePicture = `/uploads/${req.file.filename}`;
+        const uploadedUrl = (req.file as any).path || (req.file as any).secure_url;
+        if (uploadedUrl) {
+          updatePayload.profilePicture = uploadedUrl;
+        }
       }
 
       const updatedUser = await userRepository.updateUser(id, updatePayload);

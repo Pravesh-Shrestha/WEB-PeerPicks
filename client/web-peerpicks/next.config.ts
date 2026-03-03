@@ -1,34 +1,38 @@
 import type { NextConfig } from "next";
 
+// Resolve API base robustly; fall back to localhost if env is missing or malformed
+const resolveApiBase = () => {
+  const candidate =
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    'http://localhost:3000';
+  try {
+    return new URL(candidate.trim().replace(/\/$/, ''));
+  } catch {
+    return new URL('http://localhost:3000');
+  }
+};
+
+const apiUrl = resolveApiBase();
+const imagePort = apiUrl.port || undefined;
+
 const nextConfig: NextConfig = {
   images: {
     dangerouslyAllowLocalIP: true,
     remotePatterns: [
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3000', // The PORT where the backend serves images
-        pathname: '/uploads/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost', // Your Network IP
-        port: '3000',
-        pathname: '/uploads/**',
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
       }
     ],
   },
   async rewrites() {
+    const destinationBase = apiUrl.toString().replace(/\/$/, '');
     return [
       {
-        // Maps frontend:3004/api to backend:3000/api
+        // Proxy frontend /api/* to backend API
         source: '/api/:path*',
-        destination: 'http://localhost:3000/api/:path*', 
-      },
-      {
-        // Maps frontend:3004/uploads to backend:3000/uploads
-        source: '/uploads/:path*',
-        destination: 'http://localhost:3000/uploads/:path*',
+        destination: `${destinationBase}/api/:path*`, 
       },
     ];
   },

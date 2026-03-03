@@ -4,7 +4,7 @@ import path from 'path';
 dotenv.config();
 
 export const NODE_ENV: string = process.env.NODE_ENV || 'development';
-export const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+export const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 // Database URI - prioritizing local URI for development stability
 export const MONGO_URI: string = process.env.LOCAL_DATABASE_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/peerpicks_db';

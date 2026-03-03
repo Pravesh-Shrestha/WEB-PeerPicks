@@ -1,9 +1,14 @@
 import axios from 'axios';
 import { getAuthToken } from '@/lib/cookie';
 
-// VETERAN MOVE: Use a relative URL if you are using Next.js Rewrites.
-// This prevents CORS issues and makes switching to production seamless.
-const BASE_URL = 'http://localhost:3000'; 
+// Prefer an explicit API base so asset + data calls don't accidentally hit the Next.js host
+// (which manifests as 404s when the frontend and backend share port 3000).
+const rawBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:3000';
+const BASE_URL = rawBaseUrl.replace(/\/$/, '');
 
 const axiosInstance = axios.create({
     baseURL: BASE_URL,
