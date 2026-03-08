@@ -32,7 +32,7 @@ axiosInstance.interceptors.request.use(async (config) => {
 
 
 
-// axios.ts - Update the response interceptor
+
 axiosInstance.interceptors.response.use(
     (response) => response.data,
     (error) => {

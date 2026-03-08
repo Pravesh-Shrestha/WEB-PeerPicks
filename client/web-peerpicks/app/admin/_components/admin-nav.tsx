@@ -2,17 +2,17 @@
 import React from 'react';
 import { Search, Bell, Command, Loader2 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext'; // Subscribe to your context
+import { getMediaUrl } from '@/lib/utils';
 
 export default function AdminNav() {
   const { user, loading } = useAuth(); // Get data from global state
 
   const getAvatarUrl = () => {
     if (user?.profilePicture) {
-      const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-      const path = user.profilePicture.startsWith('/') ? user.profilePicture : `/${user.profilePicture}`;
-      return `${baseUrl}${path}`;
+      return getMediaUrl(user.profilePicture, 'profilePicture');
     }
-    return `https://ui-avatars.com/api/?name=${user?.fullName || 'Admin'}&background=D4FF33&color=000&bold=true`;
+    const encodedName = encodeURIComponent(user?.fullName || 'Admin');
+    return `https://ui-avatars.com/api/?name=${encodedName}&background=D4FF33&color=000&bold=true`;
   };
 
   return (
