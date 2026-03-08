@@ -1,31 +1,23 @@
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
-import path from "path";
-import fs from "fs";
 import { HttpError } from "../errors/http-error";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { cloudinaryClient, cloudinaryFolderPrefix } from "../config/cloudinary";
 
-const baseUploadDir = path.join(__dirname, '../../uploads');
+// Cloudinary storage keeps uploads off the local filesystem
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinaryClient,
+    params: async (req, file) => {
+        const folder = req.baseUrl.includes("picks") || file.fieldname === "images"
+            ? `${cloudinaryFolderPrefix}/picks`
+            : `${cloudinaryFolderPrefix}/profiles`;
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        let targetDir = baseUploadDir;
-
-        // Route 'images' (which now includes videos) to the picks folder
-        if (req.baseUrl.includes('picks') || file.fieldname === 'images') {
-            targetDir = path.join(baseUploadDir, 'picks');
-        }
-
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
-        }
-        
-        cb(null, targetDir);
+        return {
+            folder,
+            resource_type: "auto", // allow images and videos
+            public_id: uuidv4(),
+        };
     },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = uuidv4();
-        const extension = path.extname(file.originalname);
-        cb(null, uniqueSuffix + extension);
-    }
 });
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {

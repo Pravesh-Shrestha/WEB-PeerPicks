@@ -2,13 +2,10 @@
 import { Router } from "express";
 import { AdminController } from "../../controllers/admin/admin.controller";
 import { protect, isAdmin } from "../../middlewares/admin.middleware";
-import multer from "multer";
+import { uploads } from "../../middlewares/upload.middleware";
 
 const router = Router();
 const adminController = new AdminController();
-
-// Configure multer for profile pictures or media moderation if needed
-const upload = multer({ dest: 'uploads/' });
 
 /**
  * --- DASHBOARD & ANALYTICS ---
@@ -20,8 +17,8 @@ router.get('/dashboard-stats', protect, isAdmin, (req, res) => adminController.g
  */
 router.get("/users", protect, isAdmin, (req, res) => adminController.getAllUsers(req, res));
 router.get('/users/:id', protect, isAdmin, (req, res) => adminController.getUserById(req, res));
-router.post("/users", protect, isAdmin, upload.single('profilePicture'), (req, res) => adminController.createUser(req, res));
-router.put("/users/:id", protect, isAdmin, upload.single('profilePicture'), (req, res) => adminController.updateUser(req, res));
+router.post("/users", protect, isAdmin, uploads.single('profilePicture'), (req, res) => adminController.createUser(req, res));
+router.put("/users/:id", protect, isAdmin, uploads.single('profilePicture'), (req, res) => adminController.updateUser(req, res));
 router.delete("/users/:id", protect, isAdmin, (req, res) => adminController.deleteUser(req, res));
 
 /**

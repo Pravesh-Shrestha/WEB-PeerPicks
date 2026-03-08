@@ -27,4 +27,25 @@ describe('SocialService Unit Tests', () => {
       })
     );
   });
+
+  it('handleComment throws when pick missing', async () => {
+    (pickRepository.findById as jest.Mock).mockResolvedValue(null);
+    await expect(socialService.handleComment('u1', 'missing', 'hi')).rejects.toThrow('Target pick not found.');
+  });
+
+  it('handleComment notifies owner and increments count', async () => {
+    (pickRepository.findById as jest.Mock).mockResolvedValue({ _id: 'p1', user: 'owner1' });
+    (socialRepository.incrementCommentCount as jest.Mock).mockResolvedValue({});
+
+    const res = await socialService.handleComment('commenter', 'p1', 'hello');
+
+    expect(res).toEqual({ success: true });
+    expect(notificationService.createNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'COMMENT' }));
+    expect(socialRepository.incrementCommentCount).toHaveBeenCalledWith('p1');
+  });
+
+  it('handleSave errors when pick not found', async () => {
+    (pickRepository.findById as jest.Mock).mockResolvedValue(null);
+    await expect(socialService.handleSave('u1', 'missing')).rejects.toThrow('Pick not found.');
+  });
 });

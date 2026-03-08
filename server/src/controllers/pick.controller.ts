@@ -69,12 +69,15 @@ export const pickController = {
         coordinates: [placeData.lng, placeData.lat],
       };
 
+      const files = (req.files as Express.Multer.File[]) || [];
+      const mediaUrls = files
+        .map((f) => (f as any).path || (f as any).secure_url || (f as any).url)
+        .filter(Boolean);
+
       const newPick = await pickService.createNewPick(userId, placeData, {
         ...reviewData,
         location, // Pass location to the service
-        mediaUrls: (req.files as any[]).map(
-          (f) => `/uploads/picks/${f.filename}`,
-        ),
+        mediaUrls,
       });
 
       res.status(201).json({ success: true, data: newPick });

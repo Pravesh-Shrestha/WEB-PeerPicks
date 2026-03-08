@@ -2,20 +2,20 @@ export const getMediaUrl = (path: string | null | undefined, type: 'profilePictu
   if (!path) return type === 'profilePicture' ? "/default-avatar.png" : "/placeholder-pick.png"; 
   if (path.startsWith('http')) return path;
 
-  // Use the root Backend Port for static files
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'; 
-  
-  let cleanPath = path.startsWith('/') ? path : `/${path}`;
+  // Legacy assets stored on backend disk still live under /uploads
+  const rawBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    'http://localhost:3000';
+  const baseUrl = rawBaseUrl.replace(/\/$/, '');
 
-  // 1. If it's a pick and doesn't already have the subfolder, add it
-  if (type === 'pick' && !cleanPath.includes('/picks/')) {
-      cleanPath = `/picks${cleanPath}`;
-  }
+  // Already-rooted path
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
-  // 2. Ensure the whole thing is prefixed with /uploads as per your app.ts
-  if (!cleanPath.startsWith('/uploads')) {
-      cleanPath = `/uploads${cleanPath}`;
-  }
-  
+  // Legacy pick assets sometimes omit /uploads; patch it in if needed
+  if (cleanPath.startsWith('/uploads')) return `${baseUrl}${cleanPath}`;
+  if (type === 'pick' && cleanPath.startsWith('/picks')) return `${baseUrl}/uploads${cleanPath}`;
+
+  // Fallback: treat as backend-relative
   return `${baseUrl}${cleanPath}`;
 };

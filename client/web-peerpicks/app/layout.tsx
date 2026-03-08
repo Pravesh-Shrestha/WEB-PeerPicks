@@ -23,6 +23,11 @@ const archivo = Archivo({
 export const metadata: Metadata = {
   title: "PeerPicks",
   description: "Community-powered ratings and reviews",
+  icons: {
+    icon: "/logo.ico",
+    shortcut: "/logo.ico",
+    apple: "/logo.ico",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

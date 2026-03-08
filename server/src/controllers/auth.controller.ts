@@ -104,9 +104,12 @@ export class AuthController {
         });
       }
 
-      // If middleware processed a profile picture
+      // If middleware processed a profile picture, persist the remote URL
       if (req.file) {
-        parsedData.data.profilePicture = `/uploads/${req.file.filename}`;
+        const uploadedUrl = (req.file as any).path || (req.file as any).secure_url;
+        if (uploadedUrl) {
+          parsedData.data.profilePicture = uploadedUrl;
+        }
       }
 
       const updatedUser = await authService.updateUser(userId, parsedData.data);
